@@ -126,6 +126,39 @@ function calculateATR(candles: any[], period: number) {
 }
 
 /**
+ * 计算布林带指标
+ * @param prices 价格数组
+ * @param period 周期（默认20）
+ * @param stdDev 标准差倍数（默认2）
+ */
+function calculateBollingerBands(prices: number[], period: number = 20, stdDev: number = 2) {
+  if (prices.length < period) {
+    return { upper: 0, middle: 0, lower: 0, bandwidth: 0, position: 0 };
+  }
+  
+  const recentPrices = prices.slice(-period);
+  const middle = recentPrices.reduce((sum, price) => sum + price, 0) / period;
+  
+  // 计算标准差
+  const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - middle, 2), 0) / period;
+  const std = Math.sqrt(variance);
+  
+  const upper = middle + stdDev * std;
+  const lower = middle - stdDev * std;
+  const bandwidth = ((upper - lower) / middle) * 100; // 带宽百分比
+  const currentPrice = prices[prices.length - 1];
+  const position = ((currentPrice - lower) / (upper - lower)) * 100; // 0-100，表示在布林带中的位置
+  
+  return {
+    upper: ensureFinite(upper),
+    middle: ensureFinite(middle),
+    lower: ensureFinite(lower),
+    bandwidth: ensureFinite(bandwidth),
+    position: ensureRange(position, 0, 100, 50)
+  };
+}
+
+/**
  * 计算技术指标
  * 
  * K线数据格式：FuturesCandlestick 对象
@@ -152,6 +185,11 @@ function calculateIndicators(candles: any[]) {
       avgVolume: 0,
       atr3: 0,
       atr14: 0,
+      bbUpper: 0,
+      bbMiddle: 0,
+      bbLower: 0,
+      bbBandwidth: 0,
+      bbPosition: 50,
     };
   }
 
@@ -202,6 +240,9 @@ function calculateIndicators(candles: any[]) {
     };
   }
 
+  // 计算布林带指标
+  const bollingerBands = calculateBollingerBands(closes, 20, 2);
+  
   return {
     currentPrice: ensureFinite(closes.at(-1) || 0),
     ema20: ensureFinite(calculateEMA(closes, 20)),
@@ -216,6 +257,12 @@ function calculateIndicators(candles: any[]) {
     volumeRatio: ensureFinite(volumes.length > 0 && (volumes.reduce((a, b) => a + b, 0) / volumes.length) > 0 
       ? (volumes.at(-1) || 0) / (volumes.reduce((a, b) => a + b, 0) / volumes.length) 
       : 1),
+    // 布林带指标
+    bbUpper: bollingerBands.upper,
+    bbMiddle: bollingerBands.middle,
+    bbLower: bollingerBands.lower,
+    bbBandwidth: bollingerBands.bandwidth,
+    bbPosition: bollingerBands.position,
   };
 }
 
@@ -253,7 +300,7 @@ export const getMarketPriceTool = createTool({
  */
 export const getTechnicalIndicatorsTool = createTool({
   name: "getTechnicalIndicators",
-  description: "获取指定币种的技术指标（EMA、MACD、RSI等）",
+  description: "获取指定币种的技术指标（EMA、MACD、RSI、布林带等）",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
     interval: z.enum(["1m", "3m", "5m", "15m", "30m", "1h", "4h"]).default("5m").describe("K线周期"),
@@ -300,11 +347,11 @@ export const getFundingRateTool = createTool({
 });
 
 /**
- * 获取订单簿深度工具
+ * 获取订单簿深度工具（原始数据）
  */
 export const getOrderBookTool = createTool({
   name: "getOrderBook",
-  description: "获取指定币种的订单簿深度数据",
+  description: "获取指定币种的订单簿深度原始数据",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
     limit: z.number().default(10).describe("深度档位数量"),
@@ -315,21 +362,14 @@ export const getOrderBookTool = createTool({
     
     const orderBook = await client.getOrderBook(contract, limit);
     
-    const bids = orderBook.bids?.slice(0, limit).map((b: any) => ({
-      price: Number.parseFloat(b.p),
-      size: Number.parseFloat(b.s),
-    })) || [];
-    
-    const asks = orderBook.asks?.slice(0, limit).map((a: any) => ({
-      price: Number.parseFloat(a.p),
-      size: Number.parseFloat(a.s),
-    })) || [];
-    
     return {
       symbol,
-      bids,
-      asks,
-      spread: asks[0]?.price - bids[0]?.price || 0,
+      contract,
+      bids: orderBook.bids || [],
+      asks: orderBook.asks || [],
+      id: orderBook.id,
+      current: orderBook.current,
+      update: orderBook.update,
       timestamp: new Date().toISOString(),
     };
   },
@@ -352,6 +392,167 @@ export const getOpenInterestTool = createTool({
       openInterest: 0,
       timestamp: new Date().toISOString(),
     };
+  },
+});
+
+/**
+ * 分析资金费率历史趋势工具
+ */
+export const analyzeFundingRateTrendTool = createTool({
+  name: "analyzeFundingRateTrend",
+  description: "分析指定币种的资金费率历史趋势",
+  parameters: z.object({
+    symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
+    hours: z.number().default(24).describe("分析小时数，默认24小时"),
+  }),
+  execute: async ({ symbol, hours }) => {
+    const client = createGateClient();
+    const contract = `${symbol}_USDT`;
+    
+    // 计算需要获取的数据点数（资金费率每8小时结算一次）
+    const limit = Math.ceil(hours / 8);
+    
+    // 获取原始数据
+    const rawData = await client.getFundingRateHistory(contract, limit);
+    
+    if (rawData.length === 0) {
+      return {
+        symbol,
+        history: [],
+        currentRate: 0,
+        avg24h: 0,
+        trend: 'neutral',
+        volatility: 0,
+        timestamp: new Date().toISOString(),
+      };
+    }
+    
+    // 使用正确的属性名 r 和 t
+    const currentRate = parseFloat(rawData[0].r || '0');
+    const avg24h = rawData.reduce((sum, item) => sum + parseFloat(item.r || '0'), 0) / rawData.length;
+    
+    // 计算趋势（基于最近3个费率点）
+    let trend = 'neutral';
+    if (rawData.length >= 3) {
+      const recentRates = rawData.slice(0, 3).map(item => parseFloat(item.r || '0'));
+      const isIncreasing = recentRates.every((rate, i) => i === 0 || rate >= recentRates[i-1]);
+      const isDecreasing = recentRates.every((rate, i) => i === 0 || rate <= recentRates[i-1]);
+      
+      if (isIncreasing) trend = 'increasing';
+      else if (isDecreasing) trend = 'decreasing';
+    }
+    
+    // 计算波动率（标准差）
+    const variance = rawData.reduce((sum, item) => sum + Math.pow(parseFloat(item.r || '0') - avg24h, 2), 0) / rawData.length;
+    const volatility = Math.sqrt(variance);
+    
+    return {
+      symbol,
+      history: rawData.map(item => ({
+        rate: parseFloat(item.r || '0'),
+        time: item.t
+      })),
+      currentRate,
+      avg24h,
+      trend,
+      volatility,
+      timestamp: new Date().toISOString(),
+    };
+  },
+});
+
+/**
+ * 分析订单簿深度工具
+ */
+export const analyzeOrderBookDepthTool = createTool({
+  name: "analyzeOrderBookDepth",
+  description: "分析指定币种的订单簿深度，包括流动性、支撑阻力位、大额订单等",
+  parameters: z.object({
+    symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
+    depthLimit: z.number().default(50).describe("深度档位数量，默认50档"),
+  }),
+  execute: async ({ symbol, depthLimit }) => {
+    try {
+      const client = createGateClient();
+      const contract = `${symbol}_USDT`;
+      
+      // 获取原始订单簿数据
+      const orderBook = await client.getOrderBook(contract, depthLimit);
+      
+      if (!orderBook || !orderBook.asks || !orderBook.bids) {
+        return {
+          symbol,
+          error: "获取订单簿数据失败",
+          timestamp: new Date().toISOString(),
+        };
+      }
+      
+      const asks = orderBook.asks.slice(0, depthLimit);
+      const bids = orderBook.bids.slice(0, depthLimit);
+      
+      // 计算买卖盘总量（使用对象格式的p和s字段）
+      const totalAskAmount = asks.reduce((sum, ask) => sum + parseFloat(ask.s), 0);
+      const totalBidAmount = bids.reduce((sum, bid) => sum + parseFloat(bid.s), 0);
+      
+      // 计算深度比例
+      const depthRatio = totalBidAmount / totalAskAmount;
+      
+      // 识别关键价位（大额挂单）
+      const largeOrdersThreshold = Math.max(totalAskAmount, totalBidAmount) * 0.1; // 10%阈值
+      
+      const largeAsks = asks.filter(ask => parseFloat(ask.s) > largeOrdersThreshold);
+      const largeBids = bids.filter(bid => parseFloat(bid.s) > largeOrdersThreshold);
+      
+      // 计算支撑/阻力位
+      const resistanceLevels = largeAsks.map(ask => parseFloat(ask.p)).sort((a, b) => a - b);
+      const supportLevels = largeBids.map(bid => parseFloat(bid.p)).sort((a, b) => b - a);
+      
+      // 流动性风险评估
+      let liquidityRisk = 'low';
+      if (depthRatio < 0.5) liquidityRisk = 'high';
+      else if (depthRatio < 0.8) liquidityRisk = 'medium';
+      
+      // 估算当前价格（使用买卖盘中间价）
+      const bestBid = bids.length > 0 ? parseFloat(bids[0].p) : 0;
+      const bestAsk = asks.length > 0 ? parseFloat(asks[0].p) : 0;
+      const currentPrice = bestBid > 0 && bestAsk > 0 ? (bestBid + bestAsk) / 2 : 0;
+      
+      // 估算清算价位（基于订单簿分析）
+      const liquidationDistance = 0.05; // 5%距离估算
+      
+      const longLiquidationEstimate = currentPrice * (1 - liquidationDistance);
+      const shortLiquidationEstimate = currentPrice * (1 + liquidationDistance);
+      
+      return {
+        symbol,
+        contract,
+        currentPrice: parseFloat(currentPrice.toFixed(2)),
+        depthRatio: parseFloat(depthRatio.toFixed(3)),
+        totalAskAmount: parseFloat(totalAskAmount.toFixed(2)),
+        totalBidAmount: parseFloat(totalBidAmount.toFixed(2)),
+        liquidityRisk,
+        resistanceLevels: resistanceLevels.slice(0, 3), // 前3个阻力位
+        supportLevels: supportLevels.slice(0, 3), // 前3个支撑位
+        largeOrders: {
+          askCount: largeAsks.length,
+          bidCount: largeBids.length,
+          largestAsk: largeAsks.length > 0 ? parseFloat(largeAsks[0].s) : 0,
+          largestBid: largeBids.length > 0 ? parseFloat(largeBids[0].s) : 0
+        },
+        liquidationEstimates: {
+          longLiquidation: parseFloat(longLiquidationEstimate.toFixed(2)),
+          shortLiquidation: parseFloat(shortLiquidationEstimate.toFixed(2)),
+          distancePercentage: liquidationDistance * 100
+        },
+        timestamp: new Date().toISOString(),
+      };
+    } catch (error) {
+      return {
+        symbol,
+        error: `分析订单簿深度失败: ${error instanceof Error ? error.message : String(error)}`,
+        timestamp: new Date().toISOString(),
+      };
+    }
   },
 });
 

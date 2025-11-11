@@ -473,7 +473,7 @@ export class GateClient {
   }
 
   /**
-   * 获取资金费率
+   * 获取资金费率（最新）
    */
   async getFundingRate(contract: string) {
     try {
@@ -488,6 +488,28 @@ export class GateClient {
       throw error;
     }
   }
+
+  /**
+   * 获取资金费率历史
+   * @param contract 合约名称
+   * @param limit 返回数据点数，默认3个点（24小时）
+   */
+  async getFundingRateHistory(contract: string, limit: number = 3) {
+    try {
+      const result = await this.futuresApi.listFuturesFundingRateHistory(
+        this.settle,
+        contract,
+        { limit }
+      );
+      
+      return result.body; // 直接返回原始API数据
+    } catch (error) {
+      logger.error(`获取 ${contract} 资金费率历史失败:`, error as any);
+      throw error;
+    }
+  }
+
+
 
   /**
    * 获取合约信息（包含持仓量等）
@@ -531,6 +553,77 @@ export class GateClient {
       return result.body;
     } catch (error) {
       logger.error(`获取 ${contract} 订单簿失败:`, error as any);
+      throw error;
+    }
+  }
+
+  /**
+   * 分析订单簿深度
+   */
+  async analyzeOrderBookDepth(contract: string, depthLimit: number = 50) {
+    try {
+      // 获取深度订单簿
+      const orderBook = await this.getOrderBook(contract, depthLimit);
+      
+      if (!orderBook || !orderBook.asks || !orderBook.bids) {
+        throw new Error(`获取 ${contract} 订单簿数据失败`);
+      }
+      
+      const asks = orderBook.asks.slice(0, depthLimit);
+      const bids = orderBook.bids.slice(0, depthLimit);
+      
+      // 计算买卖盘总量
+      const totalAskAmount = asks.reduce((sum, ask) => sum + parseFloat(ask[1]), 0);
+      const totalBidAmount = bids.reduce((sum, bid) => sum + parseFloat(bid[1]), 0);
+      
+      // 计算深度比例
+      const depthRatio = totalBidAmount / totalAskAmount;
+      
+      // 识别关键价位（大额挂单）
+      const largeOrdersThreshold = Math.max(totalAskAmount, totalBidAmount) * 0.1; // 10%阈值
+      
+      const largeAsks = asks.filter(ask => parseFloat(ask[1]) > largeOrdersThreshold);
+      const largeBids = bids.filter(bid => parseFloat(bid[1]) > largeOrdersThreshold);
+      
+      // 计算支撑/阻力位
+      const resistanceLevels = largeAsks.map(ask => parseFloat(ask[0])).sort((a, b) => a - b);
+      const supportLevels = largeBids.map(bid => parseFloat(bid[0])).sort((a, b) => b - a);
+      
+      // 流动性风险评估
+      let liquidityRisk = 'low';
+      if (depthRatio < 0.5) liquidityRisk = 'high';
+      else if (depthRatio < 0.8) liquidityRisk = 'medium';
+      
+      // 估算清算价位（基于订单簿分析）
+      const currentPrice = parseFloat(orderBook.last || '0');
+      const liquidationDistance = 0.05; // 5%距离估算
+      
+      const longLiquidationEstimate = currentPrice * (1 - liquidationDistance);
+      const shortLiquidationEstimate = currentPrice * (1 + liquidationDistance);
+      
+      return {
+        depthRatio: parseFloat(depthRatio.toFixed(3)),
+        totalAskAmount: parseFloat(totalAskAmount.toFixed(2)),
+        totalBidAmount: parseFloat(totalBidAmount.toFixed(2)),
+        liquidityRisk,
+        resistanceLevels: resistanceLevels.slice(0, 3), // 前3个阻力位
+        supportLevels: supportLevels.slice(0, 3), // 前3个支撑位
+        largeOrders: {
+          askCount: largeAsks.length,
+          bidCount: largeBids.length,
+          largestAsk: largeAsks.length > 0 ? parseFloat(largeAsks[0][1]) : 0,
+          largestBid: largeBids.length > 0 ? parseFloat(largeBids[0][1]) : 0
+        },
+        liquidationEstimates: {
+          longLiquidation: parseFloat(longLiquidationEstimate.toFixed(2)),
+          shortLiquidation: parseFloat(shortLiquidationEstimate.toFixed(2)),
+          distancePercentage: liquidationDistance * 100
+        },
+        currentPrice,
+        timestamp: orderBook.current || Date.now()
+      };
+    } catch (error) {
+      logger.error(`分析 ${contract} 订单簿深度失败:`, error as any);
       throw error;
     }
   }

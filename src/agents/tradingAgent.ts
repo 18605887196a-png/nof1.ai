@@ -489,7 +489,13 @@ ${isCodeLevelProtectionEnabled ? (allowAiOverride ? `│                        
     const data = dataRaw as any;
     
     prompt += `\n所有 ${symbol} 数据\n`;
-    prompt += `当前价格 = ${data.price.toFixed(1)}, 当前EMA20 = ${data.ema20.toFixed(3)}, 当前MACD = ${data.macd.toFixed(3)}, 当前RSI（7周期） = ${data.rsi7.toFixed(3)}\n\n`;
+    prompt += `当前价格 = ${data.price.toFixed(1)}, 当前EMA20 = ${data.ema20.toFixed(3)}, 当前MACD = ${data.macd.toFixed(3)}, 当前RSI（7周期） = ${data.rsi7.toFixed(3)}\n`;
+    
+    // 布林带指标
+    if (data.bbUpper && data.bbMiddle && data.bbLower) {
+      prompt += `布林带: 上轨=${data.bbUpper.toFixed(2)}, 中轨=${data.bbMiddle.toFixed(2)}, 下轨=${data.bbLower.toFixed(2)}, 带宽=${data.bbBandwidth?.toFixed(4)}%, 位置=${data.bbPosition?.toFixed(2)}%\n`;
+    }
+    prompt += `\n`;
     
     // 资金费率
     if (data.fundingRate !== undefined) {
@@ -1232,6 +1238,7 @@ ${strategySpecificContent}
    - 分析多个时间框架（1分钟、3分钟、5分钟、15分钟）- 波段策略关键！
    - 重点关注：价格、EMA、MACD、RSI
    - 必须满足：${params.entryCondition}
+   - 根据需要调用 getFundingRate 和 getOrderBook 获取资金费率和订单簿深度数据，作为决策辅助参考
 
 3.5. 【关键步骤】判断当前行情类型（${params.name === '激进' ? '激进策略生存关键' : '非常重要'}）：
    

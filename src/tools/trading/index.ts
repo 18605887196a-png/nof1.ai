@@ -27,6 +27,8 @@ export {
   getFundingRateTool,
   getOrderBookTool,
   getOpenInterestTool,
+  analyzeFundingRateTrendTool,
+  analyzeOrderBookDepthTool,
 } from "./marketData";
 
 // 交易执行工具

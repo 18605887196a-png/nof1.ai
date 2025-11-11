@@ -41,13 +41,11 @@ export function createTechnicalAnalystAgent(marketDataContext?: any) {
   let instructions = `你是技术分析专家，专注于加密货币技术指标分析。
 
 你的任务：
-- 分析技术指标（EMA、MACD、RSI、成交量等）
-- 给出技术评分（1-10分）和建议方向（做多/做空/观望）
-- 结合持仓情况给出操作建议
+- 分析技术指标和资金费率对市场的影响
+- 给出技术分析和操作建议
+- 结合持仓情况评估最佳操作策略
 
-可以建议做多（Long）或做空（Short）：
-- 技术指标看涨 → 建议做多
-- 技术指标看跌 → 建议做空`;
+请根据你的专业判断给出分析结果和建议。`;
 
   // 如果有市场数据上下文，添加到指令中
   if (marketDataContext) {
@@ -62,7 +60,6 @@ export function createTechnicalAnalystAgent(marketDataContext?: any) {
       tradingTools.getMarketPriceTool,
       tradingTools.getTechnicalIndicatorsTool,
       tradingTools.getFundingRateTool,
-      tradingTools.getOrderBookTool,
       tradingTools.getAccountBalanceTool,
       tradingTools.getPositionsTool,
     ],
@@ -84,16 +81,14 @@ export function createTrendAnalystAgent(marketDataContext?: any) {
   });
 
   // 构建包含市场数据的指令
-  let instructions = `你是趋势分析专家，专注于多时间框架趋势识别。
+  let instructions = `你是趋势分析专家，专注于市场趋势识别。
 
 你的任务：
-- 分析多时间框架趋势（1m、5m、15m、30m、1h）
-- 给出趋势评分（1-10分）和建议方向（做多/做空/观望）
-- 结合持仓情况给出操作建议
+- 分析多时间框架趋势和订单簿深度
+- 给出趋势分析和操作建议
+- 结合持仓情况评估最佳操作策略
 
-可以建议做多（Long）或做空（Short）：
-- 上涨趋势 → 建议做多
-- 下跌趋势 → 建议做空`;
+请根据你的专业判断给出分析结果和建议。`;
 
   // 如果有市场数据上下文，添加到指令中
   if (marketDataContext) {
@@ -109,6 +104,8 @@ export function createTrendAnalystAgent(marketDataContext?: any) {
       tradingTools.getTechnicalIndicatorsTool,
       tradingTools.getFundingRateTool,
       tradingTools.getOrderBookTool,
+      tradingTools.analyzeFundingRateTrendTool,
+      tradingTools.analyzeOrderBookDepthTool,
       tradingTools.getAccountBalanceTool,
       tradingTools.getPositionsTool,
     ],
@@ -133,13 +130,11 @@ export function createRiskAssessorAgent(marketDataContext?: any) {
   let instructions = `你是风险评估专家，专注于市场风险识别和评估。
 
 你的任务：
-- 评估市场风险（波动率、资金费率、市场深度等）
-- 给出风险评分（1-10分，越低越安全）和风险建议
-- 结合持仓情况给出风控建议
+- 分析市场风险和流动性风险
+- 给出风险评估和风控建议
+- 结合持仓情况评估最佳风控策略
 
-做多和做空都可以，评估两个方向的风险：
-- 做多风险：上涨空间 vs 下跌风险
-- 做空风险：下跌空间 vs 上涨风险`;
+请根据你的专业判断给出分析结果和建议。`;
 
   // 如果有市场数据上下文，添加到指令中
   if (marketDataContext) {
@@ -155,6 +150,8 @@ export function createRiskAssessorAgent(marketDataContext?: any) {
       tradingTools.getTechnicalIndicatorsTool,
       tradingTools.getFundingRateTool,
       tradingTools.getOrderBookTool,
+      tradingTools.analyzeFundingRateTrendTool,
+      tradingTools.analyzeOrderBookDepthTool,
       tradingTools.getAccountBalanceTool,
       tradingTools.getPositionsTool,
     ],
