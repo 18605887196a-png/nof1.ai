@@ -94,7 +94,7 @@ open-nof1.ai 是一个 AI 驱动的加密货币自动交易系统，将大语言
 ```bash
 # 克隆仓库
 git clone <repository-url>
-cd open-nof1.ai
+cd nof1.ai
 
 # 安装依赖
 npm install
@@ -170,6 +170,8 @@ npm run dev
 # 生产模式
 npm run trading:start
 ```
+
+> **启动失败？** 合约账户为0无法交易，请从现货账户划转交易金额（测试网同样需要）。
 
 ### 第七步：访问 Web 仪表板
 

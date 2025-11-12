@@ -153,7 +153,7 @@ open-nof1.ai は、大規模言語モデルの知能と量的取引実践を深�
 ```bash
 # リポジトリをクローン
 git clone <repository-url>
-cd open-nof1.ai
+cd nof1.ai
 
 # 依存関係をインストール
 npm install
@@ -230,6 +230,8 @@ npm run dev
 npm run trading:start
 ```
 
+> **起動失敗？** 先物アカウントが0では取引できません。現物アカウントから資金を振替してください（テストネットも同様）。
+
 ### Web ダッシュボードへのアクセス
 
 ブラウザで `http://localhost:3100` にアクセスします
@@ -237,7 +239,7 @@ npm run trading:start
 ## プロジェクト構造
 
 ```
-open-nof1.ai/
+nof1.ai/
 ├── src/
 │   ├── index.ts                      # アプリケーションエントリーポイント
 │   ├── agents/
