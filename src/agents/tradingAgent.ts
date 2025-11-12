@@ -563,7 +563,14 @@ ${isCodeLevelProtectionEnabled ? (allowAiOverride ? `│                        
       for (const tf of tfList) {
         const tfData = data.timeframes[tf.key];
         if (tfData) {
-          prompt += `${tf.name}: 价格=${tfData.currentPrice.toFixed(2)}, EMA20=${tfData.ema20.toFixed(3)}, EMA50=${tfData.ema50.toFixed(3)}, MACD=${tfData.macd.toFixed(3)}, RSI7=${tfData.rsi7.toFixed(2)}, RSI14=${tfData.rsi14.toFixed(2)}, 成交量=${tfData.volume.toFixed(2)}\n`;
+          prompt += `${tf.name}: 价格=${tfData.currentPrice.toFixed(2)}, EMA20=${tfData.ema20.toFixed(3)}, EMA50=${tfData.ema50.toFixed(3)}, MACD=${tfData.macd.toFixed(3)}, RSI7=${tfData.rsi7.toFixed(2)}, RSI14=${tfData.rsi14.toFixed(2)}, 成交量=${tfData.volume.toFixed(2)}`;
+          
+          // 添加布林带指标（多时间框架分析需要）
+          if (tfData.bbUpper !== undefined && tfData.bbMiddle !== undefined && tfData.bbLower !== undefined) {
+            prompt += `, 布林带(上轨=${tfData.bbUpper.toFixed(3)}, 中轨=${tfData.bbMiddle.toFixed(3)}, 下轨=${tfData.bbLower.toFixed(3)}, 带宽=${tfData.bbBandwidth?.toFixed(2) || 0}%, 位置=${tfData.bbPosition?.toFixed(2) || 50}%)`;
+          }
+          
+          prompt += `\n`;
         }
       }
       prompt += `\n`;

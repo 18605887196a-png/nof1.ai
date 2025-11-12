@@ -200,6 +200,13 @@ export interface TimeframeIndicators {
   
   // 价格变化
   priceChange20: number; // 最近20根K线变化%
+  
+  // 布林带
+  bbUpper: number;
+  bbMiddle: number;
+  bbLower: number;
+  bbBandwidth: number;
+  bbPosition: number;
 }
 
 /**

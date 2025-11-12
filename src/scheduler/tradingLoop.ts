@@ -428,6 +428,39 @@ function calcMACD(prices: number[]) {
 }
 
 /**
+ * 计算布林带指标
+ * @param prices 价格数组
+ * @param period 周期（默认20）
+ * @param stdDev 标准差倍数（默认2）
+ */
+function calculateBollingerBands(prices: number[], period: number = 20, stdDev: number = 2) {
+  if (prices.length < period) {
+    return { upper: 0, middle: 0, lower: 0, bandwidth: 0, position: 0 };
+  }
+  
+  const recentPrices = prices.slice(-period);
+  const middle = recentPrices.reduce((sum, price) => sum + price, 0) / period;
+  
+  // 计算标准差
+  const variance = recentPrices.reduce((sum, price) => sum + Math.pow(price - middle, 2), 0) / period;
+  const std = Math.sqrt(variance);
+  
+  const upper = middle + stdDev * std;
+  const lower = middle - stdDev * std;
+  const bandwidth = ((upper - lower) / middle) * 100; // 带宽百分比
+  const currentPrice = prices[prices.length - 1];
+  const position = ((currentPrice - lower) / (upper - lower)) * 100; // 0-100，表示在布林带中的位置
+  
+  return {
+    upper: ensureFinite(upper),
+    middle: ensureFinite(middle),
+    lower: ensureFinite(lower),
+    bandwidth: ensureFinite(bandwidth),
+    position: ensureRange(position, 0, 100, 50)
+  };
+}
+
+/**
  * 计算技术指标
  * 
  * K线数据格式：FuturesCandlestick 对象
@@ -452,6 +485,11 @@ function calculateIndicators(candles: any[]) {
       rsi14: 50,
       volume: 0,
       avgVolume: 0,
+      bbUpper: 0,
+      bbMiddle: 0,
+      bbLower: 0,
+      bbBandwidth: 0,
+      bbPosition: 50,
     };
   }
 
@@ -497,8 +535,16 @@ function calculateIndicators(candles: any[]) {
       rsi14: 50,
       volume: 0,
       avgVolume: 0,
+      bbUpper: 0,
+      bbMiddle: 0,
+      bbLower: 0,
+      bbBandwidth: 0,
+      bbPosition: 50,
     };
   }
+
+  // 计算布林带指标
+  const bollingerBands = calculateBollingerBands(closes, 20, 2);
 
   return {
     currentPrice: ensureFinite(closes.at(-1) || 0),
@@ -509,6 +555,12 @@ function calculateIndicators(candles: any[]) {
     rsi14: ensureRange(calcRSI(closes, 14), 0, 100, 50),
     volume: ensureFinite(volumes.at(-1) || 0),
     avgVolume: ensureFinite(volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0),
+    // 布林带指标
+    bbUpper: bollingerBands.upper,
+    bbMiddle: bollingerBands.middle,
+    bbLower: bollingerBands.lower,
+    bbBandwidth: bollingerBands.bandwidth,
+    bbPosition: bollingerBands.position,
   };
 }
 
