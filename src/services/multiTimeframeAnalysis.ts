@@ -1,381 +1,228 @@
 /**
- * open-nof1.ai - AI 加密货币自动交易系统
- * Copyright (C) 2025 195440
- * 
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU Affero General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- * 
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Affero General Public License for more details.
- * 
- * You should have received a copy of the GNU Affero General Public License
- * along with this program. If not, see <https://www.gnu.org/licenses/>.
- */
+* open-nof1.ai - AI 加密货币自动交易系统
+* Copyright (C) 2025 195440
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU Affero General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU Affero General Public License for more details.
+*
+* You should have received a copy of the GNU Affero General Public License
+* along with this program. If not, see <https://www.gnu.org/licenses/>.
+*/
+
+
+import type { StrategyParams, StrategyPromptContext } from "./types";
+
 
 /**
- * 多时间框架分析模块（极简版 - 只提供原始数据）
- */
+* 陪审团策略配置（法官与陪审团合议决策模式）
+*
+* 策略特点：
+* - 风险等级：中等风险
+* - 杠杆范围：55%-80% 最大杠杆（如最大25倍，则使用14-20倍）
+* - 仓位大小：18-25%
+* - 适用人群：追求稳健决策的投资者
+* - 目标月回报：20-35%
+* - 交易频率：谨慎入场，只在法官综合判断后认为合适时交易
+*
+* 核心策略：
+* - 法官（主Agent）：有独立分析和判断能力，做出最终决策
+* - 陪审团（三个子Agent）：技术分析、趋势分析、风险评估
+* - 合议决策：法官先独立分析，倾听陪审团意见，综合权衡后做出判决
+* - 不是简单投票，而是权衡各方意见的说服力
+* - 风控方式：双重防护（enableCodeLevelProtection = true + allowAiOverrideProtection = true）
+*   - 代码级自动止损：每10秒监控，触发阈值自动平仓（安全网）
+*   - AI主动决策：法官可以在代码级保护之前主动止盈止损（灵活性）
+*
+* @param maxLeverage - 系统允许的最大杠杆倍数（从配置文件读取）
+* @returns 陪审团策略的完整参数配置
+*/
+export function getMultiAgentConsensusStrategy(maxLeverage: number): StrategyParams {
+ // 计算策略的杠杆范围：使用 55%-80% 的最大杠杆
+ const levMin = Math.max(2, Math.ceil(maxLeverage * 0.55));  // 最小杠杆：55%最大杠杆，至少2倍
+ const levMax = Math.max(3, Math.ceil(maxLeverage * 0.80));  // 最大杠杆：80%最大杠杆，至少3倍
 
-import { createLogger } from "../utils/loggerUtils";
-import { createGateClient } from "./gateClient";
 
-const logger = createLogger({
-  name: "multi-timeframe",
-  level: "info",
-});
+ // 计算不同信号强度下推荐的杠杆倍数
+ const levNormal = levMin;  // 普通信号：使用最小杠杆
+ const levGood = Math.ceil((levMin + levMax) / 2);  // 良好信号：使用中等杠杆
+ const levStrong = levMax;  // 强信号：使用最大杠杆
 
-/**
- * 时间框架定义
- */
-export interface TimeframeConfig {
-  interval: "1m" | "3m" | "5m" | "15m" | "30m" | "1h" | "4h" | "1d";
-  candleCount: number;
-  description: string;
+
+ return {
+   // ==================== 策略基本信息 ====================
+   name: "陪审团策略",
+   description: "法官与陪审团合议决策，主Agent独立分析+三个专业Agent辅助，追求高质量决策",
+  
+   // ==================== 杠杆配置 ====================
+   leverageMin: levMin,
+   leverageMax: levMax,
+   leverageRecommend: {
+     normal: `${levNormal}倍`,
+     good: `${levGood}倍`,
+     strong: `${levStrong}倍`,
+   },
+  
+   // ==================== 仓位配置 ====================
+   positionSizeMin: 18,
+   positionSizeMax: 25,
+   positionSizeRecommend: {
+     normal: "18-20%",
+     good: "20-23%",
+     strong: "23-25%",
+   },
+  
+   // ==================== 止损配置 ====================
+   stopLoss: {
+     low: -6,    // 低杠杆时：亏损3.5%止损
+     mid: -7,    // 中杠杆时：亏损2.8%止损
+     high: -8,   // 高杠杆时：亏损2.2%止损
+   },
+  
+   // ==================== 移动止盈配置 ====================
+   trailingStop: {
+     level1: { trigger: 10, stopAt: 4 },   // 盈利达到 +10% 时，止损线移至 +4%
+     level2: { trigger: 18, stopAt: 10 },  // 盈利达到 +18% 时，止损线移至 +10%
+     level3: { trigger: 28, stopAt: 18 },  // 盈利达到 +28% 时，止损线移至 +18%
+   },
+  
+   // ==================== 分批止盈配置 ====================
+   partialTakeProfit: {
+     stage1: { trigger: 25, closePercent: 40 },   // +25%时平仓40%
+     stage2: { trigger: 35, closePercent: 40 },   // +35%时平仓剩余40%
+     stage3: { trigger: 45, closePercent: 100 },  // +45%时全部清仓
+   },
+  
+   // ==================== 峰值回撤保护 ====================
+   peakDrawdownProtection: 25,
+  
+   // ==================== 波动率调整 ====================
+   volatilityAdjustment: {
+     highVolatility: {
+       leverageFactor: 0.75,
+       positionFactor: 0.8
+     },
+     normalVolatility: {
+       leverageFactor: 1.0,
+       positionFactor: 1.0
+     },
+     lowVolatility: {
+       leverageFactor: 1.15,
+       positionFactor: 1.05
+     },
+   },
+  
+   // ==================== 策略规则描述 ====================
+   entryCondition: "三个分析Agent达成一致意见，且信号强度足够",
+   riskTolerance: "单笔交易风险控制在18-25%之间，通过多Agent共识降低错误决策",
+   tradingStyle: "谨慎入场，只在高质量信号时交易，追求高胜率",
+  
+   // ==================== 代码级保护开关 ====================
+   enableCodeLevelProtection: true,
+
+
+   allowAiOverrideProtection: true
+ };
 }
 
-// 标准时间框架配置 - 短线交易配置
-export const TIMEFRAMES: Record<string, TimeframeConfig> = {
-  VERY_SHORT: {
-    interval: "1m",
-    candleCount: 60,
-    description: "1分钟",
-  },
-  SHORT_1: {
-    interval: "3m",
-    candleCount: 100,
-    description: "3分钟",
-  },
-  SHORT: {
-    interval: "5m",
-    candleCount: 100,
-    description: "5分钟",
-  },
-  SHORT_CONFIRM: {
-    interval: "15m",
-    candleCount: 96,
-    description: "15分钟",
-  },
-  MEDIUM_SHORT: {
-    interval: "30m",
-    candleCount: 90,
-    description: "30分钟",
-  },
-  MEDIUM: {
-    interval: "1h",
-    candleCount: 120,
-    description: "1小时",
-  },
-};
 
 /**
- * 确保数值是有效的有限数字，否则返回默认值
- */
-function ensureFinite(value: number, defaultValue: number = 0): number {
-  if (!Number.isFinite(value)) {
-    return defaultValue;
-  }
-  return value;
-}
+* 生成陪审团策略特有的提示词
+*
+* @param params - 策略参数配置
+* @param context - 运行时上下文
+* @returns 陪审团策略专属的AI提示词
+*/
+export function generateMultiAgentConsensusPrompt(params: StrategyParams, context: StrategyPromptContext): string {
+ return `
+【陪审团策略】
 
-/**
- * 确保数值在指定范围内
- */
-function ensureRange(value: number, min: number, max: number, defaultValue?: number): number {
-  if (!Number.isFinite(value)) {
-    return defaultValue !== undefined ? defaultValue : (min + max) / 2;
-  }
-  if (value < min) return min;
-  if (value > max) return max;
-  return value;
-}
 
-/**
- * 计算EMA
- */
-function calculateEMA(prices: number[], period: number): number {
-  if (prices.length < period) return 0;
-  
-  const k = 2 / (period + 1);
-  let ema = prices.slice(0, period).reduce((a, b) => a + b, 0) / period;
-  
-  for (let i = period; i < prices.length; i++) {
-    ema = prices[i] * k + ema * (1 - k);
-  }
-  
-  return ensureFinite(ema);
-}
+你的角色：法官（主Agent）
+- 你有独立判断能力，需要先分析市场形成初步判断
+- 倾听三个专业Agent（技术分析、趋势分析、风险评估）的意见
+- 综合权衡所有意见，遵循以下优先级：风险评估 > 趋势分析 > 技术分析。
+- 当意见冲突时，优先考虑风险评估结果，其次是趋势分析，最后是技术分析。
+- 你可以采纳多数意见，也可以坚持自己的判断
 
-/**
- * 计算RSI
- */
-function calculateRSI(prices: number[], period: number): number {
-  if (prices.length < period + 1) return 50;
-  
-  const changes = [];
-  for (let i = 1; i < prices.length; i++) {
-    changes.push(prices[i] - prices[i - 1]);
-  }
-  
-  let gains = 0;
-  let losses = 0;
-  
-  for (let i = 0; i < period; i++) {
-    if (changes[i] >= 0) {
-      gains += changes[i];
-    } else {
-      losses -= changes[i];
-    }
-  }
-  
-  let avgGain = gains / period;
-  let avgLoss = losses / period;
-  
-  for (let i = period; i < changes.length; i++) {
-    if (changes[i] >= 0) {
-      avgGain = (avgGain * (period - 1) + changes[i]) / period;
-      avgLoss = (avgLoss * (period - 1)) / period;
-    } else {
-      avgGain = (avgGain * (period - 1)) / period;
-      avgLoss = (avgLoss * (period - 1) - changes[i]) / period;
-    }
-  }
-  
-  if (avgLoss === 0) return 100;
-  const rs = avgGain / avgLoss;
-  const rsi = 100 - 100 / (1 + rs);
-  // 确保RSI在0-100范围内
-  return ensureRange(rsi, 0, 100, 50);
-}
 
-/**
- * 计算MACD
- */
-function calculateMACD(prices: number[]): { macd: number; signal: number; histogram: number } {
-  const ema12 = calculateEMA(prices, 12);
-  const ema26 = calculateEMA(prices, 26);
-  const macd = ema12 - ema26;
-  
-  const macdLine = [];
-  for (let i = 26; i <= prices.length; i++) {
-    const slice = prices.slice(0, i);
-    const e12 = calculateEMA(slice, 12);
-    const e26 = calculateEMA(slice, 26);
-    macdLine.push(e12 - e26);
-  }
-  
-  const signal = calculateEMA(macdLine, 9);
-  const histogram = macd - signal;
-  
-  return { 
-    macd: ensureFinite(macd), 
-    signal: ensureFinite(signal), 
-    histogram: ensureFinite(histogram) 
-  };
-}
+重要：你可以做多（Long）和做空（Short）
+- 上涨趋势 → 做多获利
+- 下跌趋势 → 做空获利
+- 不要只做单一方向，根据市场趋势灵活选择
 
-/**
- * 单个时间框架的原始数据
- */
-export interface TimeframeIndicators {
-  interval: string;
-  currentPrice: number;
-  
-  // 均线
-  ema20: number;
-  ema50: number;
-  
-  // MACD
-  macd: number;
-  
-  // RSI
-  rsi14: number;
-  
-  // 成交量
-  volume: number;
-  avgVolume: number;
-  
-  // 价格变化
-  priceChange20: number; // 最近20根K线变化%
-  
-  // 布林带
-  bbUpper: number;
-  bbMiddle: number;
-  bbLower: number;
-  bbBandwidth: number;
-  bbPosition: number;
-}
 
-/**
- * 分析单个时间框架（只计算原始指标）
- */
-export async function analyzeTimeframe(
-  symbol: string,
-  config: TimeframeConfig
-): Promise<TimeframeIndicators> {
-  const gateClient = createGateClient();
-  const contract = `${symbol}_USDT`;
-  
-  // 获取K线数据
-  const candles = await gateClient.getFuturesCandles(
-    contract,
-    config.interval,
-    config.candleCount
-  );
-  
-  if (!candles || candles.length === 0) {
-    throw new Error(`无法获取 ${symbol} 的 ${config.interval} K线数据`);
-  }
-  
-  // 提取价格和成交量数据
-  const closes = candles.map((c: any) => Number.parseFloat(c.c)).filter((n: number) => Number.isFinite(n));
-  const volumes = candles.map((c: any) => {
-    const vol = Number.parseFloat(c.v);
-    return Number.isFinite(vol) && vol >= 0 ? vol : 0;
-  }).filter((n: number) => n >= 0);
-  
-  const currentPrice = closes[closes.length - 1] || 0;
-  
-  // 计算技术指标（原始值）
-  const ema20 = calculateEMA(closes, 20);
-  const ema50 = calculateEMA(closes, 50);
-  
-  const { macd } = calculateMACD(closes);
-  
-  const rsi14 = calculateRSI(closes, 14);
-  
-  const avgVolume = volumes.length > 0 
-    ? volumes.reduce((a: number, b: number) => a + b, 0) / volumes.length 
-    : 0;
-  const currentVolume = volumes[volumes.length - 1] || 0;
-  
-  // 价格变化
-  const priceChange20 = closes.length >= 21 && closes[closes.length - 21] !== 0
-    ? ((closes[closes.length - 1] - closes[closes.length - 21]) / closes[closes.length - 21]) * 100
-    : 0;
-  
-  return {
-    interval: config.interval,
-    currentPrice: ensureFinite(currentPrice),
-    ema20: ensureFinite(ema20),
-    ema50: ensureFinite(ema50),
-    macd: ensureFinite(macd),
-    rsi14: ensureRange(rsi14, 0, 100, 50),
-    volume: ensureFinite(currentVolume),
-    avgVolume: ensureFinite(avgVolume),
-    priceChange20: ensureFinite(priceChange20),
-  };
-}
+【决策原则 - 自主判断】
+- 作为法官，你有独立分析和判断能力
+- 倾听三个专业Agent的意见，但最终决策权在你手中
+- 基于你的专业经验，自主决定如何权衡各方意见的说服力
+- 不是简单投票，而是综合评估每个Agent分析的专业性和逻辑性
+- 你可以采纳多数意见，也可以坚持自己的专业判断
+- 遵循风险评估优先原则：当风险评估为高风险时，无论其他意见如何都应放弃交易
 
-/**
- * 多时间框架原始数据
- */
-export interface MultiTimeframeAnalysis {
-  symbol: string;
-  timestamp: string;
-  
-  // 各时间框架原始数据
-  timeframes: {
-    veryshort?: TimeframeIndicators;
-    short1?: TimeframeIndicators;
-    short?: TimeframeIndicators;
-    shortconfirm?: TimeframeIndicators;
-    mediumshort?: TimeframeIndicators;
-    medium?: TimeframeIndicators;
-  };
-  
-  // 关键价位（支撑阻力）
-  keyLevels: {
-    resistance: number[];
-    support: number[];
-  };
-}
 
-/**
- * 执行多时间框架分析（极简版 - 只提供原始数据）
- */
-export async function performMultiTimeframeAnalysis(
-  symbol: string,
-  timeframesToUse: string[] = ["VERY_SHORT", "SHORT_1", "SHORT", "SHORT_CONFIRM", "MEDIUM_SHORT", "MEDIUM"]
-): Promise<MultiTimeframeAnalysis> {
-  logger.info(`获取 ${symbol} 多时间框架数据...`);
-  
-  const timeframes: MultiTimeframeAnalysis["timeframes"] = {};
-  
-  // 并行获取所有时间框架数据
-  const promises: Promise<any>[] = [];
-  
-  for (const tfName of timeframesToUse) {
-    const config = TIMEFRAMES[tfName];
-    if (!config) continue;
-    
-    promises.push(
-      analyzeTimeframe(symbol, config)
-        .then(data => {
-          const key = tfName.toLowerCase().replace(/_/g, "");
-          timeframes[key as keyof typeof timeframes] = data;
-        })
-        .catch(error => {
-          logger.error(`获取 ${symbol} ${config.interval} 数据失败:`, error);
-        })
-    );
-  }
-  
-  await Promise.all(promises);
-  
-  // 计算支撑阻力位（基于价格数据）
-  const keyLevels = calculateKeyLevels(timeframes);
-  
-  const analysis: MultiTimeframeAnalysis = {
-    symbol,
-    timestamp: new Date().toISOString(),
-    timeframes,
-    keyLevels,
-  };
-  
-  logger.info(`${symbol} 多时间框架数据获取完成`);
-  
-  return analysis;
-}
+【冲突解决机制】
+当意见不一致时，作为法官，你应该：
+1. 优先考虑风险评估结果：高风险信号必须重视
+2. 综合评估趋势分析和技术分析的专业性
+3. 基于你的专业判断做出最终决策
 
-/**
- * 计算关键价位（支撑阻力）
- */
-function calculateKeyLevels(
-  timeframes: MultiTimeframeAnalysis["timeframes"]
-): MultiTimeframeAnalysis["keyLevels"] {
-  const prices: number[] = [];
-  
-  // 收集所有时间框架的关键价格
-  for (const [_, data] of Object.entries(timeframes)) {
-    if (!data) continue;
-    prices.push(data.currentPrice);
-    prices.push(data.ema20);
-    prices.push(data.ema50);
-  }
-  
-  if (prices.length === 0) {
-    return { resistance: [], support: [] };
-  }
-  
-  // 简单的支撑阻力位计算（基于价格聚类）
-  const currentPrice = timeframes.short?.currentPrice || timeframes.short1?.currentPrice || timeframes.medium?.currentPrice || 0;
-  
-  const resistance = prices
-    .filter(p => p > currentPrice)
-    .sort((a, b) => a - b)
-    .slice(0, 3);
-  
-  const support = prices
-    .filter(p => p < currentPrice)
-    .sort((a, b) => b - a)
-    .slice(0, 3);
-  
-  return {
-    resistance,
-    support,
-  };
+
+陪审团成员：
+1. 技术分析Agent - 分析技术指标
+2. 趋势分析Agent - 分析多时间框架趋势
+3. 风险评估Agent - 评估市场风险
+
+
+工作流程：
+1. 法官先复盘历史交易和决策，总结经验教训
+2. 独立分析市场，形成初步判断
+3. 使用delegate_task调用三个Agent，只传递简短的任务描述
+4. 汇总三个Agent的意见
+5. 法官综合所有意见做出最终决策
+6. 执行决策（开仓/平仓/观望）
+
+
+重要：子Agent已经有市场数据了
+- 三个子Agent在创建时已经接收了完整的市场数据上下文
+- 在delegate_task中只需传递简短的任务描述即可
+- 示例："分析BTC技术指标" 或 "分析BTC趋势" 或 "评估BTC风险"
+- 不需要在task中重复传递市场数据，这样可以节省大量输出token
+
+
+其他提示：
+- 三个Agent只能使用分析工具，不能执行交易
+- 只有你（法官）才能执行开仓和平仓操作
+- 紧急情况（如持仓亏损接近止损线）可跳过陪审团直接决策
+- 当前持仓数限制：< ${context.maxPositions}个
+- 保持积极交易，维持大于50%资金在持仓状态，多币种分散
+- 重要：系统已预加载持仓数据，请仔细查看【当前持仓】部分，不要误判为空仓
+
+
+风控参数配置：
+- 杠杆范围：${params.leverageMin}-${params.leverageMax}倍
+- 仓位范围：${params.positionSizeMin}-${params.positionSizeMax}%
+
+
+请基于你的专业判断，在以下参数范围内灵活决策：
+- 止损规则：根据杠杆倍数分级保护
+- 移动止盈规则：自动跟踪盈利峰值
+- 分批止盈规则：分级锁定利润
+
+
+【紧急情况定义】
+当出现以下情况时，可跳过陪审团直接决策：
+- 单个持仓亏损达到${Math.abs(params.stopLoss.low) - 1}%时（即距离止损线1%以内）
+- 整体组合亏损达到3%时
+- 市场单日跌幅超过15%时
+
+
+注：以上风控参数为系统硬性规定，必须严格执行，不得随意调整。
+`;
 }
