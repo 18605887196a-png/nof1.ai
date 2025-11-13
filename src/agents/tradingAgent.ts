@@ -443,22 +443,6 @@ export function generateTradingPrompt(data: {
    return generateAiAutonomousPromptForCycle(data);
  }
 
-
- // 生成止损规则描述（基于 stopLoss 配置和杠杆范围）
- const generateStopLossDescriptions = () => {
-   const levMin = params.leverageMin;
-   const levMax = params.leverageMax;
-   const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
-   const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
-   return [
-     `${levMin}-${lowThreshold}倍杠杆，亏损 ${params.stopLoss.low}% 时止损`,
-     `${lowThreshold + 1}-${midThreshold}倍杠杆，亏损 ${params.stopLoss.mid}% 时止损`,
-     `${midThreshold + 1}倍以上杠杆，亏损 ${params.stopLoss.high}% 时止损`,
-   ];
- };
- const stopLossDescriptions = generateStopLossDescriptions();
-
-
  // 生成专业交易原则框架
 const generateTradingPrinciples = () => {
  return `【专业交易原则】
@@ -471,86 +455,6 @@ const generateTradingPrinciples = () => {
 • 止损纪律：严格执行止损，不抱侥幸心理
 • 情绪控制：避免因近期盈亏影响当前决策`;
 };
-
-
-// 生成市场环境评估框架
-const generateMarketEnvironmentAssessment = (marketData: any) => {
- // 计算整体趋势
- let trendDirection = "震荡";
- let trendStrength = 0;
- let volatilityLevel = "中等";
-
-
- // 分析主要币种的EMA趋势
- const symbols = Object.keys(marketData);
- if (symbols.length > 0) {
-   let bullishCount = 0;
-   let bearishCount = 0;
-   let totalBandwidth = 0;
-   let bandwidthCount = 0;
-  
-   for (const symbol of symbols) {
-     const data = marketData[symbol] as any;
-     if (data.ema20 && data.price) {
-       if (data.price > data.ema20) bullishCount++;
-       else bearishCount++;
-     }
-    
-     // 计算布林带带宽作为波动率指标
-     if (data.bbUpper && data.bbLower && data.bbMiddle) {
-       const bandwidth = ((data.bbUpper - data.bbLower) / data.bbMiddle) * 100;
-       totalBandwidth += bandwidth;
-       bandwidthCount++;
-     }
-   }
-  
-   // 判断整体趋势
-   if (bullishCount > bearishCount * 1.5) {
-     trendDirection = "上涨";
-     trendStrength = Math.min((bullishCount / symbols.length) * 100, 100);
-   } else if (bearishCount > bullishCount * 1.5) {
-     trendDirection = "下跌";
-     trendStrength = Math.min((bearishCount / symbols.length) * 100, 100);
-   } else {
-     trendDirection = "震荡";
-     trendStrength = 50;
-   }
-  
-   // 判断波动率
-   if (bandwidthCount > 0) {
-     const avgBandwidth = totalBandwidth / bandwidthCount;
-     if (avgBandwidth < 3) volatilityLevel = "低";
-     else if (avgBandwidth > 6) volatilityLevel = "高";
-     else volatilityLevel = "中等";
-   }
- }
-
-
- // 评估交易机会
- let opportunityRating = "中等";
- if (trendDirection !== "震荡" && trendStrength > 70) {
-   opportunityRating = "高";
- } else if (trendDirection === "震荡" || trendStrength < 40) {
-   opportunityRating = "低";
- }
-
-
- // 评估风险等级
- let riskLevel = "中等";
- if (volatilityLevel === "高") riskLevel = "高";
- else if (volatilityLevel === "低" && trendDirection !== "震荡") riskLevel = "低";
-
-
- return `【市场环境概览】
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-
-整体趋势：${trendDirection} (强度: ${trendStrength.toFixed(0)}%)
-波动率水平：${volatilityLevel}
-交易机会评级：${opportunityRating}
-风险等级：${riskLevel}`;
-};
-
 
 // 生成策略表现分析
 const generateStrategyPerformanceAnalysis = (tradeHistory: any[]) => {
@@ -645,14 +549,6 @@ let prompt = `# 交易决策 #${iteration} | ${currentTime} | ${params.name}策�
 ${generateTradingPrinciples()}
 
 
-【技术指标说明】
-• EMA20：趋势方向参考
-• MACD：动量指标，正值上涨动能，负值下跌动能
-• RSI(7)：超买超卖指标，>70超买，<30超卖
-• 布林带：波动率指标，上轨超买，下轨超卖
-• 资金费率：永续合约资金成本
-
-
 ## 决策优先级
 1️⃣ 持仓管理（止损/止盈/峰值回撤）
 2️⃣ 新开仓机会（多时间框架趋势+技术共振）
@@ -665,25 +561,33 @@ ${generateTradingPrinciples()}
 - 分批止盈：+${params.partialTakeProfit.stage1.trigger}%→${params.partialTakeProfit.stage1.closePercent}% | +${params.partialTakeProfit.stage2.trigger}%→${params.partialTakeProfit.stage2.closePercent}% | +${params.partialTakeProfit.stage3.trigger}%→${params.partialTakeProfit.stage3.closePercent}%
 - 峰值回撤：≥${params.peakDrawdownProtection}%立即平仓
 ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动管理` : `- AI主动管理：监控峰值回撤`}
-
-
 `;
 
 
- // 市场数据展示
+ // 市场数据展示 - 提供各币种技术指标详情，让AI基于详细数据进行自主分析
  prompt += `## 市场数据
-${generateMarketEnvironmentAssessment(marketData)}
 
+### 技术指标说明
+请基于以下各币种的详细技术指标数据进行综合分析：
+- 评估各币种的趋势方向（上涨/下跌/盘整）
+- 识别超买超卖信号（RSI指标）
+- 分析动量变化（MACD指标）
+- 判断价格相对于布林带的位置
+- 考虑资金费率对持仓成本的影响
+- 分析波动率（ATR指标）评估风险
+- 结合成交量确认趋势强度
+- 结合多时间框架数据进行综合趋势确认
 
+### 各币种技术指标详情
 `;
 
-
- // 按照 1.md 格式输出每个币种的数据
+ // 格式化输出每个币种的市场数据，为AI交易决策提供技术指标参考
+ // 包含：价格、EMA20、MACD、RSI7、布林带、资金费率、多时间框架分析、短期趋势判断
  for (const [symbol, dataRaw] of Object.entries(marketData)) {
    const data = dataRaw as any;
   
    prompt += `### ${symbol}
-价格: ${data.price.toFixed(1)} | EMA20: ${data.ema20.toFixed(3)} | MACD: ${data.macd.toFixed(3)} | RSI7: ${data.rsi7.toFixed(3)}`;
+价格: ${data.price.toFixed(1)} | EMA20: ${data.ema20.toFixed(3)} | EMA50: ${data.ema50.toFixed(3)} | MACD: ${data.macd.toFixed(3)} | RSI7: ${data.rsi7.toFixed(3)} | RSI14: ${data.rsi14.toFixed(3)}`;
   
    // 布林带指标
    if (data.bbUpper && data.bbMiddle && data.bbLower) {
@@ -695,41 +599,39 @@ ${generateMarketEnvironmentAssessment(marketData)}
      prompt += ` | 资金费率:${data.fundingRate.toExponential(2)}`;
    }
   
+   // ATR指标（波动率）
+   if (data.longerTermContext && data.longerTermContext.atr14) {
+     prompt += ` | ATR14: ${data.longerTermContext.atr14.toFixed(3)}`;
+   }
+  
+   // 成交量
+   if (data.volume !== undefined) {
+     prompt += ` | 成交量: ${(data.volume / 1000).toFixed(1)}K`;
+   }
+  
    prompt += `\n`;
   
-   // 多时间框架关键数据（简化版）
+   // 多时间框架关键数据（简洁版）
    if (data.timeframes) {
-     const keyTfs = ['5m', '15m', '1h'];
+     const keyTfs = ['3m','5m', '15m', '1h'];
      let tfData = [];
     
      for (const tf of keyTfs) {
        const tfInfo = data.timeframes[tf];
        if (tfInfo) {
-         tfData.push(`${tf}:价格${tfInfo.currentPrice.toFixed(2)} EMA${tfInfo.ema20.toFixed(3)} MACD${tfInfo.macd.toFixed(3)} RSI${tfInfo.rsi7.toFixed(0)}`);
+         // 简洁格式：时间框架 + 关键指标
+         tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA${tfInfo.ema20.toFixed(2)} | MACD${tfInfo.macd.toFixed(3)} | RSI${tfInfo.rsi7.toFixed(0)}`);
        }
      }
     
      if (tfData.length > 0) {
-       prompt += `多时间框架: ${tfData.join(' | ')}\n`;
+       prompt += `多时间框架数据（3分钟/5分钟/15分钟/1小时周期）:\n`;
+       prompt += `  ${tfData.join('\n  ')}\n`;
      }
-   }
-  
-   // 最新趋势信号（简化版）
-   if (data.intradaySeries && data.intradaySeries.midPrices.length > 0) {
-     const series = data.intradaySeries;
-     const recentPrices = series.midPrices.slice(-5);
-     const recentEmas = series.ema20Series.slice(-5);
-    
-     // 简单趋势判断
-     const priceTrend = recentPrices[recentPrices.length-1] > recentPrices[0] ? '↑' : '↓';
-     const emaTrend = recentEmas[recentEmas.length-1] > recentEmas[0] ? '↑' : '↓';
-    
-     prompt += `短期趋势: 价格${priceTrend} EMA${emaTrend} | 最新RSI7:${series.rsi7Series[series.rsi7Series.length-1].toFixed(1)}\n`;
    }
   
    prompt += `\n`;
  }
-
 
  // 账户信息
  prompt += `## 账户状态
@@ -798,28 +700,36 @@ ${generateMarketEnvironmentAssessment(marketData)}
  }
 
 
- // 历史决策记录（简化版）
+ // 历史决策记录（优化版）
  if (recentDecisions && recentDecisions.length > 0) {
-   prompt += `## 历史决策\n`;
+   prompt += `## 近期决策参考\n`;
   
-   for (let i = 0; i < Math.min(recentDecisions.length, 1); i++) {
+   // 显示最近10条决策，提供更全面的参考
+   for (let i = 0; i < Math.min(recentDecisions.length, 10); i++) {
      const decision = recentDecisions[i];
      const timeDiff = Math.floor((new Date().getTime() - new Date(decision.timestamp).getTime()) / (1000 * 60));
+     const hoursDiff = Math.floor(timeDiff / 60);
+     const daysDiff = Math.floor(hoursDiff / 24);
+     
+     let displayTime;
+     if (daysDiff > 0) {
+       displayTime = `${daysDiff}天前`;
+     } else if (hoursDiff > 0) {
+       displayTime = `${hoursDiff}小时前`;
+     } else {
+       displayTime = `${timeDiff}分钟前`;
+     }
     
-     prompt += `#${decision.iteration} (${timeDiff}分钟前): ${decision.decision.substring(0, 50)}...\n`;
+     prompt += `#${decision.iteration} (${displayTime}): ${decision.decision.substring(0, 60)}...\n`;
    }
   
-   prompt += `*仅供参考，基于当前数据独立判断*\n`;
+   prompt += `*基于当前市场数据独立判断*\n\n`;
  }
 
 
- // 自我复盘提示
- prompt += `\n## 自我复盘要求\n`;
- prompt += `在做出交易决策前，请快速回顾最近的交易表现：\n`;
- prompt += `• 分析盈亏原因和模式\n`;
- prompt += `• 识别可改进的决策点\n`;
- prompt += `• 基于复盘结果优化当前策略\n`;
- prompt += `• 然后再执行具体交易操作\n\n`;
+ // 简洁的复盘提示
+ prompt += `## 复盘要求\n`;
+ prompt += `快速回顾交易表现，识别改进点，优化当前策略。\n\n`;
 
 
  return prompt;
