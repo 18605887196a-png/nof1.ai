@@ -48,3 +48,6 @@ export {
   syncPositionsTool,
 } from "./accountManagement";
 
+export {
+  scientificTrendlineAnalysisTool,
+} from "./scientificTrendlineAnalysis";
