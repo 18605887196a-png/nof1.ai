@@ -21,6 +21,7 @@ import { Agent } from "@voltagent/core";
 import { createOpenAI } from "@ai-sdk/openai";
 import * as tradingTools from "../tools/trading";
 import { createLogger } from "../utils/loggerUtils";
+import { createOpenAIClientWithRotation } from "../utils/apiKeyManager";
 
 
 const logger = createLogger({
@@ -34,11 +35,8 @@ const logger = createLogger({
 * 专注于技术指标分析
 * @param marketDataContext 市场数据上下文（可选）
 */
-export function createTechnicalAnalystAgent(marketDataContext?: any) {
- const openai = createOpenAI({
-   apiKey: process.env.OPENAI_API_KEY || "",
-   baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
- });
+export async function createTechnicalAnalystAgent(marketDataContext?: any) {
+ const openai = await createOpenAIClientWithRotation();
 
 
  // 构建包含市场数据的指令
@@ -99,11 +97,8 @@ export function createTechnicalAnalystAgent(marketDataContext?: any) {
 * 专注于多时间框架趋势分析
 * @param marketDataContext 市场数据上下文（可选）
 */
-export function createTrendAnalystAgent(marketDataContext?: any) {
- const openai = createOpenAI({
-   apiKey: process.env.OPENAI_API_KEY || "",
-   baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
- });
+export async function createTrendAnalystAgent(marketDataContext?: any) {
+ const openai = await createOpenAIClientWithRotation();
 
 
  // 构建包含市场数据的指令
@@ -169,11 +164,8 @@ export function createTrendAnalystAgent(marketDataContext?: any) {
 * 专注于市场风险评估
 * @param marketDataContext 市场数据上下文（可选）
 */
-export function createRiskAssessorAgent(marketDataContext?: any) {
- const openai = createOpenAI({
-   apiKey: process.env.OPENAI_API_KEY || "",
-   baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
- });
+export async function createRiskAssessorAgent(marketDataContext?: any) {
+ const openai = await createOpenAIClientWithRotation();
 
 
  // 构建包含市场数据的指令

@@ -26,6 +26,7 @@ import { createOpenAI } from "@ai-sdk/openai";
 import * as tradingTools from "../tools/trading";
 import { formatChinaTime } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
+import { createOpenAIClientWithRotation } from "../utils/apiKeyManager";
 
 /**
  * 账户风险配置
@@ -964,11 +965,8 @@ ${strategySpecificContent}
  * @param marketDataContext 市场数据上下文（可选，用于子Agent）
  */
 export async function createTradingAgent(intervalMinutes: number = 5, marketDataContext?: any) {
-  // 使用 OpenAI SDK，通过配置 baseURL 兼容 OpenRouter 或其他供应商
-  const openai = createOpenAI({
-    apiKey: process.env.OPENAI_API_KEY || "",
-    baseURL: process.env.OPENAI_BASE_URL || "https://openrouter.ai/api/v1",
-  });
+  // 使用 API 密钥轮询管理器创建 OpenAI 客户端
+  const openai = await createOpenAIClientWithRotation();
 
   const memory = new Memory({
     storage: new LibSQLMemoryAdapter({
