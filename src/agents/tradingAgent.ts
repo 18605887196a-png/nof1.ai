@@ -480,7 +480,9 @@ const generateStrategyPerformanceAnalysis = (tradeHistory: any[]) => {
 
  const totalProfit = profitTrades.reduce((sum, t) => sum + t.pnl, 0);
  const totalLoss = Math.abs(lossTrades.reduce((sum, t) => sum + t.pnl, 0));
- const profitLossRatio = totalLoss > 0 ? (totalProfit / totalLoss) : 0;
+ const avgProfit = profitTrades.length > 0 ? totalProfit / profitTrades.length : 0;
+ const avgLoss = lossTrades.length > 0 ? totalLoss / lossTrades.length : 0;
+ const profitLossRatio = avgLoss > 0 ? (avgProfit / avgLoss) : 0;
 
 
  // 计算最大连续盈利和亏损
