@@ -1017,15 +1017,26 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
  let subAgents: Agent[] | undefined;
  if (strategy === "multi-agent-consensus") {
    logger.info("创建陪审团策略的子Agent（陪审团成员）...");
-   const { createTechnicalAnalystAgent, createTrendAnalystAgent, createRiskAssessorAgent } = await import("./analysisAgents");
-  
+   const { createTechnicalAnalystAgent, createTrendAnalystAgent, createRiskAssessorAgent, createPatternRecognizerAgent } = await import("./analysisAgents");
+ 
    // 传递市场数据上下文给子Agent（异步创建）
-   subAgents = await Promise.all([
+   const agents = [
      createTechnicalAnalystAgent(marketDataContext),
      createTrendAnalystAgent(marketDataContext),
      createRiskAssessorAgent(marketDataContext),
-   ]);
-   logger.info("陪审团成员创建完成：技术分析Agent、趋势分析Agent、风险评估Agent");
+   ];
+   
+   // 根据环境变量决定是否启用视觉模式识别Agent
+   const enableVisualPatternAgent = process.env.ENABLE_VISUAL_PATTERN_AGENT !== 'false';
+   if (enableVisualPatternAgent) {
+     agents.push(createPatternRecognizerAgent(marketDataContext));
+   }
+   
+   subAgents = await Promise.all(agents);
+    const agentNames = enableVisualPatternAgent 
+      ? "技术分析Agent、趋势分析Agent、风险评估Agent、视觉模式识别Agent"
+      : "技术分析Agent、趋势分析Agent、风险评估Agent";
+    logger.info(`陪审团成员创建完成：${agentNames}`);
  }
 
 

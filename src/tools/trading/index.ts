@@ -48,6 +48,5 @@ export {
   syncPositionsTool,
 } from "./accountManagement";
 
-export {
-  scientificTrendlineAnalysisTool,
-} from "./scientificTrendlineAnalysis";
+export { scientificTrendlineAnalysisTool } from "./scientificTrendlineAnalysis";
+export { patternAnalysisTool, generateCandlestickChartTool } from "./patternRecognition";

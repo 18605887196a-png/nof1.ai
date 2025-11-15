@@ -19,17 +19,17 @@
 
 
 
-import {Agent} from "@voltagent/core";
+import { Agent } from "@voltagent/core";
 import * as tradingTools from "../tools/trading";
-import {createLogger} from "../utils/loggerUtils";
-import {createOpenAIClientWithRotation} from "../utils/apiKeyManager";
+import { createLogger } from "../utils/loggerUtils";
+import { createOpenAIClientWithRotation } from "../utils/apiKeyManager";
 
 
 
 
 const logger = createLogger({
-   service: "analysis-agents",
-   level: (process.env.LOG_LEVEL as any) || "info",
+  name: "analysis-agents",
+  level: (process.env.LOG_LEVEL as any) || "info",
 });
 
 
@@ -41,13 +41,13 @@ const logger = createLogger({
 * @param marketDataContext 市场数据上下文（可选）
 */
 export async function createTechnicalAnalystAgent(marketDataContext?: any) {
-   const openai = await createOpenAIClientWithRotation();
+    const openai = await createOpenAIClientWithRotation();
 
 
 
 
-   // 构建包含市场数据的指令
-   let instructions = `你是技术分析专家，专注于加密货币技术指标分析。
+    // 构建包含市场数据的指令
+    let instructions = `你是技术分析专家，专注于加密货币技术指标分析。
 
 
 
@@ -85,32 +85,32 @@ export async function createTechnicalAnalystAgent(marketDataContext?: any) {
 
 
 
-   // 如果有市场数据上下文，添加到指令中
-   if (marketDataContext) {
-       instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
-   }
+    // 如果有市场数据上下文，添加到指令中
+    if (marketDataContext) {
+        instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
+    }
 
 
 
 
-   const agent = new Agent({
-       name: "技术分析Agent",
-       instructions,
-       model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
-       tools: [
-           tradingTools.getMarketPriceTool,
-           tradingTools.getTechnicalIndicatorsTool,
-           tradingTools.getFundingRateTool,
-           tradingTools.getAccountBalanceTool,
-           tradingTools.getPositionsTool,
-       ],
-       logger: logger.child({agent: "技术分析Agent"}),
-   });
+    const agent = new Agent({
+        name: "技术分析Agent",
+        instructions,
+        model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
+        tools: [
+            tradingTools.getMarketPriceTool,
+            tradingTools.getTechnicalIndicatorsTool,
+            tradingTools.getFundingRateTool,
+            tradingTools.getAccountBalanceTool,
+            tradingTools.getPositionsTool,
+        ],
+        logger: logger.child({ agent: "技术分析Agent" }),
+    });
 
 
 
 
-   return agent;
+    return agent;
 }
 
 
@@ -122,11 +122,11 @@ export async function createTechnicalAnalystAgent(marketDataContext?: any) {
 * @param marketDataContext 市场数据上下文（可选）
 */
 export async function createTrendAnalystAgent(marketDataContext?: any) {
-   const openai = await createOpenAIClientWithRotation();
+    const openai = await createOpenAIClientWithRotation();
 
 
-   // 构建包含市场数据的指令
-   let instructions = `你是趋势分析专家，专注于市场趋势识别和趋势线分析。
+    // 构建包含市场数据的指令
+    let instructions = `你是趋势分析专家，专注于市场趋势识别和趋势线分析。
 
 
 你的职责：
@@ -162,60 +162,52 @@ export async function createTrendAnalystAgent(marketDataContext?: any) {
 请基于你的专业经验给出客观的趋势分析结论。`;
 
 
-   // 如果有市场数据上下文，添加到指令中
-   if (marketDataContext) {
-       instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
-   }
+    // 如果有市场数据上下文，添加到指令中
+    if (marketDataContext) {
+        instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
+    }
 
 
-   const agent = new Agent({
-       name: "趋势分析Agent",
-       instructions,
-       model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
-       tools: [
-           tradingTools.getMarketPriceTool,
-           tradingTools.getTechnicalIndicatorsTool,
-           tradingTools.getFundingRateTool,
-           tradingTools.getOrderBookTool,
-           tradingTools.analyzeFundingRateTrendTool,
-           tradingTools.analyzeOrderBookDepthTool,
-           tradingTools.scientificTrendlineAnalysisTool,
-           tradingTools.getAccountBalanceTool,
-           tradingTools.getPositionsTool,
-       ],
-       logger: logger.child({agent: "趋势分析Agent"}),
-   });
+    const agent = new Agent({
+        name: "趋势分析Agent",
+        instructions,
+        model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
+        tools: [
+            tradingTools.getMarketPriceTool,
+            tradingTools.getTechnicalIndicatorsTool,
+            tradingTools.getFundingRateTool,
+            tradingTools.getOrderBookTool,
+            tradingTools.analyzeFundingRateTrendTool,
+            tradingTools.analyzeOrderBookDepthTool,
+            tradingTools.scientificTrendlineAnalysisTool,
+            tradingTools.getAccountBalanceTool,
+            tradingTools.getPositionsTool,
+        ],
+        logger: logger.child({ agent: "趋势分析Agent" }),
+    });
 
 
-   return agent;
+    return agent;
 }
 
 
 
 
 /**
-* 创建风险评估Agent
-* 专注于市场风险评估
-* @param marketDataContext 市场数据上下文（可选）
-*/
+ * 创建风险评估Agent
+ * 专注于市场风险评估
+ * @param marketDataContext 市场数据上下文（可选）
+ */
 export async function createRiskAssessorAgent(marketDataContext?: any) {
-   const openai = await createOpenAIClientWithRotation();
+    const openai = await createOpenAIClientWithRotation();
 
-
-
-
-   // 构建包含市场数据的指令
-   let instructions = `你是风险评估专家，专注于市场风险识别和评估。
-
-
-
+    // 构建包含市场数据的指令
+    let instructions = `你是风险评估专家，专注于市场风险识别和评估。
 
 你的职责：
 - 评估当前市场风险水平
 - 识别潜在的风险因素
 - 提供风险管理建议
-
-
 
 
 你可以使用的工具：
@@ -229,16 +221,12 @@ export async function createRiskAssessorAgent(marketDataContext?: any) {
 - getPositionsTool
 
 
-
-
 请基于你的专业判断给出风险评估结论，包括：
 - 风险等级（低/中/高/极高）
 - 风险评分（1-10分，7分以上为高风险）
 - 置信度评估（高/中/低）
 - 主要风险因素和潜在影响
 - 风险管理建议（具体措施）
-
-
 
 
 请基于你的专业经验给出客观的风险评估结论，综合考虑：
@@ -248,40 +236,84 @@ export async function createRiskAssessorAgent(marketDataContext?: any) {
 - 市场情绪和外部因素
 
 
-
-
 作为风险评估专家，你应该自主决定如何权衡各种风险因素，给出最准确的风险评估。`;
 
+    // 如果有市场数据上下文，添加到指令中
+    if (marketDataContext) {
+        instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
+    }
 
+    const agent = new Agent({
+        name: "风险评估Agent",
+        instructions,
+        model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
+        tools: [
+            tradingTools.getMarketPriceTool,
+            tradingTools.getTechnicalIndicatorsTool,
+            tradingTools.getFundingRateTool,
+            tradingTools.getOrderBookTool,
+            tradingTools.analyzeFundingRateTrendTool,
+            tradingTools.analyzeOrderBookDepthTool,
+            tradingTools.getAccountBalanceTool,
+            tradingTools.getPositionsTool,
+        ],
+        logger: logger.child({ agent: "风险评估Agent" }),
+    });
 
+    return agent;
+}
 
-   // 如果有市场数据上下文，添加到指令中
-   if (marketDataContext) {
-       instructions += `\n\n当前市场数据上下文：\n${JSON.stringify(marketDataContext, null, 2)}`;
-   }
+/**
+ * 创建视觉模式识别Agent
+ * 专注于K线图形态识别和视觉模式分析
+ * @param marketDataContext 市场数据上下文（可选，但此Agent不使用）
+ */
+export async function createPatternRecognizerAgent(marketDataContext?: any) {
+  const openai = await createOpenAIClientWithRotation();
 
+  // 获取交易间隔对应的时间框架
+  const intervalMinutes = Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5");
+  const timeframe = `${intervalMinutes}m`;
 
+  // 添加时间框架信息到指令中
+  let timeframeInstruction = `当前使用的时间框架是：${timeframe}\n`;
 
+  // 不要直接从marketDataContext获取symbol，因为它包含所有符号的信息，应该由agent根据需要选择
 
-   const agent = new Agent({
-       name: "风险评估Agent",
-       instructions,
-       model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
-       tools: [
-           tradingTools.getMarketPriceTool,
-           tradingTools.getTechnicalIndicatorsTool,
-           tradingTools.getFundingRateTool,
-           tradingTools.getOrderBookTool,
-           tradingTools.analyzeFundingRateTrendTool,
-           tradingTools.analyzeOrderBookDepthTool,
-           tradingTools.getAccountBalanceTool,
-           tradingTools.getPositionsTool,
-       ],
-       logger: logger.child({agent: "风险评估Agent"}),
-   });
+  // 构建Agent指令
+  const instructions = `${timeframeInstruction}你是一名专业的交易形态分析师，专注于价格行为和市场结构分析。
 
+职责：
+- 识别K线图中的经典交易形态
+- 分析形态的完整性和有效性  
+- 评估形态的突破概率和目标位
+- 提供基于视觉模式识别的交易建议
 
+分析框架：
+1. 结构完整性：评估价格结构的完整性和逻辑性
+2. 对称性分析：观察形态的几何对称性和平衡性
+3. 支撑阻力：识别关键价位和突破点
+4. 时间因素：考虑形态发育的时间跨度
+5. 市场环境：结合当前市场环境判断有效性
 
+输出要求：
+- 形态识别：明确是否有可交易形态
+- 完成度评估：高/中/低（并说明理由）
+- 突破概率：高/中/低（基于结构强度）
+- 目标位测算：基于形态高度的合理区间
+- 风险提示：假突破的可能性和止损位置
 
-   return agent;
+注意：你专注于视觉模式识别，负责分析K线图中的形态并提供专业结论，避免生搬硬套标准形态`;
+
+  const agent = new Agent({
+    name: "视觉模式识别Agent", 
+    instructions,
+    model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
+    tools: [
+      tradingTools.patternAnalysisTool,
+    ],
+    logger: logger.child({agent: "视觉模式识别Agent"}),
+  });
+
+  return agent;
 }

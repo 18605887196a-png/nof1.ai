@@ -4,16 +4,22 @@
 */
 
 
+
+
 import { createTool } from "@voltagent/core";
 import { z } from "zod";
 import { createLogger } from "../../utils/loggerUtils";
 import { createGateClient } from "../../services/gateClient";
 
 
+
+
 const logger = createLogger({
-   service: "scientific-trendline-analysis",
-   level: (process.env.LOG_LEVEL as any) || "info",
+    name: "scientific-trendline-analysis",
+    level: (process.env.LOG_LEVEL as any) || "info",
 });
+
+
 
 
 // 数据点接口
@@ -22,6 +28,8 @@ interface DataPoint {
    price: number;
    index: number;
 }
+
+
 
 
 // 趋势线接口
@@ -37,6 +45,8 @@ interface TrendLine {
 }
 
 
+
+
 // 价格通道接口
 interface PriceChannel {
    upperLine: TrendLine;
@@ -46,6 +56,8 @@ interface PriceChannel {
    breakoutLevel: "upper" | "lower" | "none";
    confidence: number;  // 通道置信度
 }
+
+
 
 
 // 分析结果接口
@@ -77,6 +89,8 @@ interface TrendAnalysisResult {
 }
 
 
+
+
 /**
 * 科学的最小二乘法趋势线计算
 * 包含统计显著性检验
@@ -85,8 +99,12 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
    if (points.length < 3) return null; // 至少需要3个点
 
 
+
+
    const n = points.length;
    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0, sumY2 = 0;
+
+
 
 
    points.forEach(point => {
@@ -98,14 +116,25 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
    });
 
 
+
+
    // 最小二乘法计算斜率和截距
-   const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+   const denominator = n * sumX2 - sumX * sumX;
+   if (Math.abs(denominator) < 1e-10) {
+       // 几乎垂直或水平线，避免除零
+       return null;
+   }
+   const slope = (n * sumXY - sumX * sumY) / denominator;
    const intercept = (sumY - slope * sumX) / n;
+
+
 
 
    // 计算R²（拟合优度）
    const yMean = sumY / n;
    let ssTotal = 0, ssResidual = 0;
+
+
 
 
    points.forEach(point => {
@@ -115,7 +144,12 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
    });
 
 
-   const r2 = 1 - (ssResidual / ssTotal);
+
+
+   // 🔧 修复：防止 ssTotal 为 0 导致 NaN
+   const r2 = ssTotal === 0 ? 1 : Math.max(0, 1 - (ssResidual / ssTotal));
+
+
 
 
    // 计算统计显著性（t检验）
@@ -125,10 +159,13 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
    const significance = Math.min(1, tStat / 10); // 简化的显著性指标
 
 
+
+
    // 计算触碰点数量（价格在趋势线±0.5%范围内）
    let touchPoints = 0;
    const tolerance = 0.005; // 0.5%的容差
-  
+
+
    points.forEach(point => {
        const predictedPrice = slope * point.index + intercept;
        const deviation = Math.abs(point.price - predictedPrice) / predictedPrice;
@@ -136,11 +173,15 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
    });
 
 
+
+
    // 计算趋势线强度（多因子模型）
    const r2Weight = Math.max(0, r2 - 0.5) * 2; // R²>0.5才开始计分
    const touchWeight = touchPoints / n;
    const significanceWeight = significance;
    const strength = Math.min(1, (r2Weight * 0.4 + touchWeight * 0.3 + significanceWeight * 0.3));
+
+
 
 
    return {
@@ -154,6 +195,8 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
        significance,
    };
 }
+
+
 
 
 /**
@@ -171,6 +214,8 @@ function findSignificantExtremes(prices: number[], windowSize: number = 5): {
    }));
 
 
+
+
    // 计算价格分位数作为参考（使用更宽松的分位数）
    const sortedPrices = [...prices].sort((a, b) => a - b);
    const lowerQuantile = sortedPrices[Math.floor(sortedPrices.length * 0.15)]; // 15%分位数
@@ -178,36 +223,58 @@ function findSignificantExtremes(prices: number[], windowSize: number = 5): {
    const priceRange = upperQuantile - lowerQuantile;
 
 
+
+
    const lows: DataPoint[] = [];
    const highs: DataPoint[] = [];
 
 
-   // 识别局部低点（必须低于下四分位数才有意义）
+
+
+   // 🔧 修复：优化局部低点识别，避免平台期重复
    for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
        const current = dataPoints[i];
-       const isLocalMin = Array.from({length: windowSize * 2 + 1}, (_, j) => i - windowSize + j)
-           .every(idx => current.price <= dataPoints[idx].price);
-      
+
+
+       const isLocalMin =
+           Array.from({ length: windowSize }, (_, j) => i - j - 1)
+               .every(idx => dataPoints[idx].price > current.price) &&
+           Array.from({ length: windowSize }, (_, j) => i + j + 1)
+               .every(idx => dataPoints[idx].price >= current.price);
+
+
        if (isLocalMin && current.price <= lowerQuantile + priceRange * 0.1) {
            lows.push(current);
        }
    }
 
 
-   // 识别局部高点（必须高于上四分位数才有意义）
+
+
+   // 🔧 修复：优化局部高点识别
    for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
        const current = dataPoints[i];
-       const isLocalMax = Array.from({length: windowSize * 2 + 1}, (_, j) => i - windowSize + j)
-           .every(idx => current.price >= dataPoints[idx].price);
-      
+
+
+       const isLocalMax =
+           Array.from({ length: windowSize }, (_, j) => i - j - 1)
+               .every(idx => dataPoints[idx].price < current.price) &&
+           Array.from({ length: windowSize }, (_, j) => i + j + 1)
+               .every(idx => dataPoints[idx].price <= current.price);
+
+
        if (isLocalMax && current.price >= upperQuantile - priceRange * 0.1) {
            highs.push(current);
        }
    }
 
 
+
+
    return { lows, highs };
 }
+
+
 
 
 /**
@@ -216,33 +283,48 @@ function findSignificantExtremes(prices: number[], windowSize: number = 5): {
 */
 function findSupportLines(prices: number[], minPoints: number = 3): TrendLine[] {
    const { lows } = findSignificantExtremes(prices);
-  
+
+
    if (lows.length < minPoints) return [];
 
 
+
+
    const supportLines: TrendLine[] = [];
-  
+   const MAX_COMBINATIONS = 50; // 🔧 性能保护：最多尝试50种组合
+   let combinationCount = 0;
+
+
    // 按时间顺序尝试不同的点组合
    for (let startIdx = 0; startIdx <= lows.length - minPoints; startIdx++) {
        for (let endIdx = startIdx + minPoints - 1; endIdx < lows.length; endIdx++) {
+           if (combinationCount++ > MAX_COMBINATIONS) break;
+
+
            const points = lows.slice(startIdx, endIdx + 1);
-          
-           // 确保点之间有一定的时间间隔
+
+
            // 确保点之间有一定的时间间隔（放宽到10%）
            const timeSpan = points[points.length - 1].index - points[0].index;
            if (timeSpan < prices.length * 0.1) continue; // 至少覆盖10%的时间跨度
            const line = calculateTrendLine(points);
-          
+
+
            if (line && line.r2 > 0.6 && line.strength > 0.5 && line.significance > 0.3) {
                supportLines.push(line);
            }
        }
+       if (combinationCount > MAX_COMBINATIONS) break;
    }
+
+
 
 
    // 按强度排序并去重（避免过于相似的线）
    return deduplicateTrendLines(supportLines.sort((a, b) => b.strength - a.strength));
 }
+
+
 
 
 /**
@@ -251,28 +333,43 @@ function findSupportLines(prices: number[], minPoints: number = 3): TrendLine[] 
 */
 function findResistanceLines(prices: number[], minPoints: number = 3): TrendLine[] {
    const { highs } = findSignificantExtremes(prices);
-  
+
+
    if (highs.length < minPoints) return [];
 
 
+
+
    const resistanceLines: TrendLine[] = [];
-  
+   const MAX_COMBINATIONS = 50; // 🔧 性能保护
+   let combinationCount = 0;
+
+
    // 按时间顺序尝试不同的点组合
    for (let startIdx = 0; startIdx <= highs.length - minPoints; startIdx++) {
        for (let endIdx = startIdx + minPoints - 1; endIdx < highs.length; endIdx++) {
+           if (combinationCount++ > MAX_COMBINATIONS) break;
+
+
            const points = highs.slice(startIdx, endIdx + 1);
-          
-               // 确保点之间有一定的时间间隔（放宽到10%）
-               const timeSpan = points[points.length - 1].index - points[0].index;
-               if (timeSpan < prices.length * 0.1) continue; // 至少覆盖10%的时间跨度
-          
+
+
+           // 确保点之间有一定的时间间隔（放宽到10%）
+           const timeSpan = points[points.length - 1].index - points[0].index;
+           if (timeSpan < prices.length * 0.1) continue; // 至少覆盖10%的时间跨度
+
+
            const line = calculateTrendLine(points);
-          
+
+
            if (line && line.r2 > 0.6 && line.strength > 0.5 && line.significance > 0.3) {
                resistanceLines.push(line);
            }
        }
+       if (combinationCount > MAX_COMBINATIONS) break;
    }
+
+
 
 
    // 按强度排序并去重（避免过于相似的线）
@@ -280,26 +377,43 @@ function findResistanceLines(prices: number[], minPoints: number = 3): TrendLine
 }
 
 
+
+
 /**
 * 趋势线去重（避免过于相似的线）
 */
 function deduplicateTrendLines(lines: TrendLine[]): TrendLine[] {
+   if (lines.length === 0) return lines;
+
+
    const unique: TrendLine[] = [];
-  
+   // 🔧 使用第一条线的价格和时间尺度进行归一化
+   const priceScale = (lines[0].startPoint.price + lines[0].endPoint.price) / 2;
+   const timeScale = lines[0].endPoint.index - lines[0].startPoint.index || 1;
+
+
    for (const line of lines) {
        const isDuplicate = unique.some(existing => {
-           const slopeDiff = Math.abs(line.slope - existing.slope);
+           // 归一化斜率差异：转换为相对价格变动比例
+           const normalizedSlopeDiff = Math.abs(line.slope - existing.slope) * timeScale / priceScale;
            const interceptDiff = Math.abs(line.intercept - existing.intercept);
-           return slopeDiff < 0.1 && interceptDiff < existing.endPoint.price * 0.02;
+
+
+           return normalizedSlopeDiff < 0.05 && // 斜率差异 < 5%
+               interceptDiff < priceScale * 0.02; // 截距差异 < 2%
        });
-      
+
+
        if (!isDuplicate) {
            unique.push(line);
        }
    }
-  
+
+
    return unique.slice(0, 3); // 返回前3条
 }
+
+
 
 
 /**
@@ -315,8 +429,12 @@ function identifyPriceChannel(
    if (supportLines.length === 0 || resistanceLines.length === 0) return null;
 
 
+
+
    let bestChannel: PriceChannel | null = null;
    let maxConfidence = 0;
+
+
 
 
    for (const support of supportLines) {
@@ -324,22 +442,30 @@ function identifyPriceChannel(
            // 检查是否为平行通道（斜率差异<5%）
            const slopeDiff = Math.abs(support.slope - resistance.slope);
            const avgSlope = (Math.abs(support.slope) + Math.abs(resistance.slope)) / 2;
-          
+
+
            if (slopeDiff > avgSlope * 0.05) continue;
+
+
 
 
            // 计算通道在当前时间点的价格
            const currentIndex = prices.length - 1;
            const lowerPrice = support.slope * currentIndex + support.intercept;
            const upperPrice = resistance.slope * currentIndex + resistance.intercept;
-          
+
+
            // 确保通道合理（上轨价格>下轨价格）
            if (upperPrice <= lowerPrice) continue;
-          
+
+
            const width = ((upperPrice - lowerPrice) / lowerPrice) * 100;
-          
+
+
            // 通道宽度合理（1%-20%）
            if (width < 1 || width > 20) continue;
+
+
 
 
            // 计算通道置信度
@@ -348,9 +474,11 @@ function identifyPriceChannel(
                const channelUpper = resistance.slope * idx + resistance.intercept;
                return price >= channelLower && price <= channelUpper;
            }).length;
-          
+
+
            const confidence = priceInChannel / prices.length;
-          
+
+
            // 判断突破
            let breakoutLevel: "upper" | "lower" | "none" = "none";
            if (currentPrice > upperPrice * 1.003) {
@@ -358,6 +486,8 @@ function identifyPriceChannel(
            } else if (currentPrice < lowerPrice * 0.997) {
                breakoutLevel = "lower";
            }
+
+
 
 
            if (confidence > maxConfidence && confidence > 0.6) {
@@ -375,8 +505,12 @@ function identifyPriceChannel(
    }
 
 
+
+
    return bestChannel;
 }
+
+
 
 
 /**
@@ -395,10 +529,13 @@ function analyzeMarketTrend(
 } {
    const currentPrice = prices[prices.length - 1];
    const priceChange = ((currentPrice - prices[0]) / prices[0]) * 100;
-  
+
+
    // 计算价格波动率
    const returns = prices.slice(1).map((price, i) => (price - prices[i]) / prices[i]);
    const volatility = Math.sqrt(returns.reduce((sum, ret) => sum + ret * ret, 0) / returns.length) * Math.sqrt(252);
+
+
 
 
    // 基于多因子判断趋势方向
@@ -406,28 +543,38 @@ function analyzeMarketTrend(
    let directionScore = 0;
 
 
+
+
    // 价格变化因子（40%权重）
    if (priceChange > 3) directionScore += 0.4;
    else if (priceChange < -3) directionScore -= 0.4;
 
 
+
+
    // 趋势线因子（30%权重）
    const supportStrength = supportLines.length > 0 ? supportLines[0].strength : 0;
    const resistanceStrength = resistanceLines.length > 0 ? resistanceLines[0].strength : 0;
-  
+
+
    if (supportStrength > resistanceStrength + 0.2) directionScore += 0.3;
    else if (resistanceStrength > supportStrength + 0.2) directionScore -= 0.3;
+
+
 
 
    // 通道因子（30%权重）
    if (channel && channel.isValid) {
        const channelPosition = ((currentPrice - channel.lowerLine.slope * (prices.length - 1) - channel.lowerLine.intercept) /
-                              (channel.upperLine.slope * (prices.length - 1) + channel.upperLine.intercept -
-                               channel.lowerLine.slope * (prices.length - 1) - channel.lowerLine.intercept));
-      
+           (channel.upperLine.slope * (prices.length - 1) + channel.upperLine.intercept -
+               channel.lowerLine.slope * (prices.length - 1) - channel.lowerLine.intercept));
+
+
        if (channelPosition > 0.7) directionScore -= 0.15;
        else if (channelPosition < 0.3) directionScore += 0.15;
    }
+
+
 
 
    // 确定趋势方向
@@ -436,14 +583,20 @@ function analyzeMarketTrend(
    else direction = "震荡";
 
 
+
+
    // 计算趋势强度（0-10）
    let strength = 5 + Math.abs(directionScore) * 5;
-  
+
+
    // 考虑波动率调整
    if (volatility < 0.2) strength *= 1.1; // 低波动率增加置信度
    else if (volatility > 0.5) strength *= 0.9; // 高波动率降低置信度
-  
+
+
    strength = Math.min(10, Math.max(0, strength));
+
+
 
 
    // 突破信号检测
@@ -454,6 +607,8 @@ function analyzeMarketTrend(
    };
 
 
+
+
    if (channel && channel.breakoutLevel !== "none") {
        breakoutSignal.hasBreakout = true;
        breakoutSignal.direction = channel.breakoutLevel === "upper" ? "上涨" : "下跌";
@@ -461,8 +616,12 @@ function analyzeMarketTrend(
    }
 
 
+
+
    return { direction, strength, breakoutSignal };
 }
+
+
 
 
 /**
@@ -483,17 +642,22 @@ function generateTradingRecommendation(
    const currentIndex = prices.length - 1;
 
 
+
+
    // 突破信号分析
    if (breakoutSignal.hasBreakout) {
        const confidenceLevel = breakoutSignal.confidence > 0.8 ? "强烈" :
-                             breakoutSignal.confidence > 0.6 ? "中等" : "潜在";
-      
+           breakoutSignal.confidence > 0.6 ? "中等" : "潜在";
+
+
        if (breakoutSignal.direction === "上涨") {
            recommendations.push(`🚀 ${confidenceLevel}上涨突破信号（置信度${(breakoutSignal.confidence * 100).toFixed(0)}%）`);
        } else {
            recommendations.push(`⚠️ ${confidenceLevel}下跌突破信号（置信度${(breakoutSignal.confidence * 100).toFixed(0)}%）`);
        }
    }
+
+
 
 
    // 关键价位分析
@@ -504,11 +668,15 @@ function generateTradingRecommendation(
    }).filter(level => Math.abs(level.distance) < 3); // 3%范围内
 
 
+
+
    const nearbyResistances = resistanceLines.map(line => {
        const price = line.slope * currentIndex + line.intercept;
        const distance = ((price - currentPrice) / currentPrice) * 100;
        return { price, distance, strength: line.strength };
    }).filter(level => Math.abs(level.distance) < 3); // 3%范围内
+
+
 
 
    if (nearbySupports.length > 0) {
@@ -517,10 +685,14 @@ function generateTradingRecommendation(
    }
 
 
+
+
    if (nearbyResistances.length > 0) {
        const strongestResistance = nearbyResistances.sort((a, b) => b.strength - a.strength)[0];
        recommendations.push(`🚧 接近强阻力位${strongestResistance.price.toFixed(2)}（距离${strongestResistance.distance.toFixed(1)}%）`);
    }
+
+
 
 
    // 趋势强度建议
@@ -533,12 +705,15 @@ function generateTradingRecommendation(
    }
 
 
+
+
    // 通道位置建议
    if (channel && channel.isValid) {
        const upperPrice = channel.upperLine.slope * currentIndex + channel.upperLine.intercept;
        const lowerPrice = channel.lowerLine.slope * currentIndex + channel.lowerLine.intercept;
        const position = ((currentPrice - lowerPrice) / (upperPrice - lowerPrice)) * 100;
-      
+
+
        if (position < 20) {
            recommendations.push(`📍 价格接近通道下轨（${position.toFixed(0)}%），反弹概率较高`);
        } else if (position > 80) {
@@ -547,8 +722,12 @@ function generateTradingRecommendation(
    }
 
 
+
+
    return recommendations.length > 0 ? recommendations.join("；") : "市场信号复杂，建议等待更明确的机会。";
 }
+
+
 
 
 /**
@@ -560,12 +739,16 @@ export const scientificTrendlineAnalysisTool = createTool({
    description: `科学的技术分析工具，提供专业的趋势线、支撑阻力位和价格通道分析。
 
 
+
+
 核心功能：
 1. 基于统计学的极值点识别
 2. 最小二乘法趋势线拟合与显著性检验
 3. 科学的价格通道识别
 4. 多维度趋势强度评估
 5. 风险调整的交易建议
+
+
 
 
 技术特点：
@@ -584,10 +767,15 @@ export const scientificTrendlineAnalysisTool = createTool({
            logger.info(`开始科学趋势线分析: ${symbol} ${timeframe} (回看${lookbackPeriods}周期)`);
 
 
+
+
            const gateClient = createGateClient();
            const contract = symbol.replace('USDT', '_USDT');
-          
+
+
            const klines = await gateClient.getFuturesCandles(contract, timeframe, lookbackPeriods);
+
+
 
 
            if (!klines || klines.length < 50) {
@@ -598,10 +786,15 @@ export const scientificTrendlineAnalysisTool = createTool({
            }
 
 
+
+
            const prices = klines.map(k => parseFloat(k.c)).filter(p => !isNaN(p) && p > 0);
            const currentPrice = prices[prices.length - 1];
-          
+
+
            logger.info(`成功获取 ${prices.length} 个价格数据点`);
+
+
 
 
            // 科学识别支撑线和阻力线
@@ -609,11 +802,17 @@ export const scientificTrendlineAnalysisTool = createTool({
            const resistanceLines = findResistanceLines(prices);
 
 
+
+
            logger.info(`找到${supportLines.length}条支撑线，${resistanceLines.length}条阻力线`);
+
+
 
 
            // 科学识别价格通道
            const channel = identifyPriceChannel(supportLines, resistanceLines, currentPrice, prices);
+
+
 
 
            // 提取关键价位（不再强制修正，相信科学算法）
@@ -629,6 +828,8 @@ export const scientificTrendlineAnalysisTool = createTool({
            };
 
 
+
+
            // 科学分析市场趋势
            const {direction, strength, breakoutSignal} = analyzeMarketTrend(
                prices,
@@ -636,6 +837,8 @@ export const scientificTrendlineAnalysisTool = createTool({
                resistanceLines,
                channel
            );
+
+
 
 
            // 生成科学的交易建议
@@ -649,6 +852,8 @@ export const scientificTrendlineAnalysisTool = createTool({
                resistanceLines,
                prices
            );
+
+
 
 
            const result: TrendAnalysisResult = {
@@ -680,7 +885,11 @@ export const scientificTrendlineAnalysisTool = createTool({
            };
 
 
+
+
            logger.info(`科学趋势线分析完成: ${symbol} - ${direction}趋势（强度${strength.toFixed(1)}）`);
+
+
 
 
            return {

@@ -33,7 +33,7 @@ import type { StrategyParams, StrategyPromptContext } from "./types";
 *
 * 核心策略：
 * - 法官（主Agent）：有独立分析和判断能力，做出最终决策
-* - 陪审团（三个子Agent）：技术分析、趋势分析、风险评估
+* - 陪审团（四个子Agent）：技术分析、趋势分析、风险评估
 * - 合议决策：法官先独立分析，倾听陪审团意见，综合权衡后做出判决
 * - 不是简单投票，而是权衡各方意见的说服力
 * - 风控方式：双重防护（enableCodeLevelProtection = true + allowAiOverrideProtection = true）
@@ -119,7 +119,7 @@ export function getMultiAgentConsensusStrategy(maxLeverage: number): StrategyPar
    },
   
    // ==================== 策略规则描述 ====================
-   entryCondition: "三个分析Agent达成一致意见，且信号强度足够",
+   entryCondition: "四个分析Agent达成一致意见，且信号强度足够",
    riskTolerance: "单笔交易风险控制在18-25%之间，通过多Agent共识降低错误决策",
    tradingStyle: "谨慎入场，只在高质量信号时交易，追求高胜率",
   
@@ -158,16 +158,17 @@ export function generateMultiAgentConsensusPrompt(params: StrategyParams, contex
   - 对每笔交易负全责，盈亏都是你的专业判断结果
 
 
-专业顾问团（你的三个专业分析师）：
+专业顾问团（你的四个专业分析师）：
 1. **技术分析Agent** - 你的技术指标专家，提供量化信号
 2. **趋势分析Agent** - 你的趋势判断专家，多时间框架分析 
 3. **风险评估Agent** - 你的风控专家，确保交易安全性
+4. **视觉模式识别Agent** - 你的K线图形态专家，识别经典交易形态
 
 
 专业决策流程：
 1. **专业复盘**：先独立分析历史交易，总结专业经验教训
 2. **独立判断**：基于专业知识形成初步交易观点
-3. **专家咨询**：调用三个专业Agent获取不同角度的专业意见
+3. **专家咨询**：调用四个专业Agent获取不同角度的专业意见
 4. **专业合议**：综合所有专业意见，做出最终专业决策
 5. **专业执行**：立即执行符合专业标准的交易决策
 
@@ -179,13 +180,20 @@ export function generateMultiAgentConsensusPrompt(params: StrategyParams, contex
 - **专业双向交易**：可以做多（Long）和做空（Short），根据市场趋势灵活选择
 - **专业积极性**：保持专业交易频率，维持合理资金利用率
 
+决策流程：
+1. 首先咨询技术分析Agent获取技术指标信号
+2. 然后咨询趋势分析Agent了解市场趋势方向
+3. 接着咨询视觉模式识别Agent分析K线图形态
+4. 最后咨询风险评估Agent评估交易风险
+5. 综合各方意见，做出最终决策
+
 
 关键提醒：
-- 三个子Agent在创建时已经接收了完整的市场数据上下文
+- 四个子Agent在创建时已经接收了完整的市场数据上下文
 - 在delegate_task中只需传递简短的任务描述即可
-- 示例："分析BTC技术指标" 或 "分析BTC趋势" 或 "评估BTC风险"
+- 示例："分析BTC技术指标" 或 "分析BTC趋势" 或 "分析BTC K线形态" 或 "评估BTC风险"
 - 不需要在task中重复传递市场数据，节省输出token
-- 三个Agent只能使用分析工具，不能执行交易
+- 四个Agent只能使用分析工具，不能执行交易
 - 只有你（专业交易员法官）才能执行开仓和平仓操作
 - 重要：系统已预加载持仓数据，请仔细查看【当前持仓】部分，不要误判为空仓
 

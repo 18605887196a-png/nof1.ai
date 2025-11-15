@@ -172,7 +172,7 @@ function calculateBollingerBands(prices: number[], period: number = 20, stdDev: 
  *   sum: string   // 总成交额
  * }
  */
-function calculateIndicators(candles: any[]) {
+export function calculateIndicators(candles: any[]) {
   if (!candles || candles.length === 0) {
     return {
       currentPrice: 0,
