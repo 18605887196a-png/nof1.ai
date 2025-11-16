@@ -152,24 +152,24 @@ const patternAnalysisTool = tool({
   description: "进行K线图形态识别分析，生成K线图并提供专业的形态分析结果",
   parameters: z.object({
     symbol: z.enum(["BTC", "ETH", "SOL", "BNB", "ADA", "XRP", "DOGE", "AVAX", "DOT", "MATIC"]).describe("币种代码"),
-    timeframe: z.string().default(`${Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5")}m`).describe("时间框架，如1m, 5m, 15m, 1h, 4h, 1d等"),
+    timeframe: z.string().default("15m").describe("时间框架，如1m, 5m, 15m, 1h, 4h, 1d等"),
   }),
   execute: async ({ symbol, timeframe }) => {
     try {
       // 使用统一的模式分析函数，包含错误处理
-      const finalTimeframe = timeframe || `${Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5")}m`;
+      const finalTimeframe = timeframe || "15m";
       const result = await getPatternAnalysis(symbol, finalTimeframe);
       
+      // 优化返回数据：只返回分析摘要，不返回base64图像数据
       return {
         symbol,
         timeframe: finalTimeframe,
-        chart: result.chart,
         analysis: result.analysis,
         timestamp: new Date().toISOString(),
         success: true
       };
     } catch (error) {
-      const finalTimeframe = timeframe || `${Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5")}m`;
+      const finalTimeframe = timeframe || "15m";
       return {
         symbol,
         timeframe: finalTimeframe,
@@ -437,35 +437,197 @@ function drawCandlestickSVG(
   `;
   
   // 添加时间轴标签
-  const timeLabels = [];
-  const labelCount = Math.min(12, klineData.length); // 增加标签数量
-  const step = Math.floor(klineData.length / labelCount);
-  
-  for (let i = 0; i < labelCount; i++) {
-    const index = Math.min(i * step, klineData.length - 1);
-    const candle = klineData[index];
-    const x = padding.left + candleSpacing * index + candleSpacing / 2;
+    const labelCount = Math.min(15, klineData.length); // 增加标签数量以显示更多时间点
     
-    let timeLabel = '';
-    if (timeframe.includes('m')) {
-      // 分钟级别
-      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
-      timeLabel = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
-    } else if (timeframe.includes('h')) {
-      // 小时级别
-      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
-      timeLabel = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
-    } else if (timeframe.includes('d')) {
-      // 日线级别
-      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
-      timeLabel = `${date.getMonth() + 1}/${date.getDate()}`;
+    // 优化标签选择逻辑，确保时间标签在整个范围内均匀分布
+    const indices = [];
+    
+    // 如果数据点足够多，使用更智能的分布策略
+    if (klineData.length > labelCount) {
+      // 计算总时间范围
+      const startTime = klineData[0]?.timestamp || 0;
+      const endTime = klineData[klineData.length - 1]?.timestamp || 0;
+      const totalTimeRange = endTime - startTime;
+      
+
+      
+      // 基于时间间隔均匀选择标签，而不仅仅是基于索引
+      for (let i = 0; i < labelCount; i++) {
+        // 计算当前标签的目标时间点
+        const targetTime = startTime + (totalTimeRange * i / (labelCount - 1));
+        
+        // 找到最接近目标时间的索引
+        let closestIndex = 0;
+        let minTimeDiff = Infinity;
+        
+        // 为了性能，我们只在关键区域搜索
+        const searchStart = Math.floor((klineData.length - 1) * (i - 0.1) / (labelCount - 1));
+        const searchEnd = Math.floor((klineData.length - 1) * (i + 0.1) / (labelCount - 1));
+        
+        for (let j = Math.max(0, searchStart); j <= Math.min(klineData.length - 1, searchEnd); j++) {
+          const currentTime = klineData[j]?.timestamp || 0;
+          const timeDiff = Math.abs(currentTime - targetTime);
+          
+          if (timeDiff < minTimeDiff) {
+            minTimeDiff = timeDiff;
+            closestIndex = j;
+          }
+        }
+        
+        // 确保不重复添加索引
+        if (!indices.includes(closestIndex)) {
+          indices.push(closestIndex);
+        }
+      }
+      
+      // 确保包含首尾点
+      if (!indices.includes(0)) {
+        indices.unshift(0);
+      }
+      if (!indices.includes(klineData.length - 1)) {
+        indices.push(klineData.length - 1);
+      }
     } else {
-      // 默认显示时间戳
-      timeLabel = candle.timestamp ? new Date(candle.timestamp).toLocaleTimeString() : 'N/A';
+      // 数据点较少时，直接使用所有索引
+      for (let i = 0; i < klineData.length; i++) {
+        indices.push(i);
+      }
     }
     
-    svgContent += `
-      <text x="${x}" y="${height - padding.bottom + 25}" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="12" font-weight="bold">
+    // 按索引排序并去重
+    indices.sort((a, b) => a - b);
+    
+    
+    
+    // 遍历选中的索引生成标签
+    for (const index of indices) {
+      const candle = klineData[index];
+      const x = padding.left + candleSpacing * index + candleSpacing / 2;
+      
+      let timeLabel = '';
+      try {
+        // 改进的时间戳验证和转换逻辑
+        const timestamp = candle.timestamp;
+        
+        // 详细的日志记录用于调试
+        
+        
+        if (timestamp && typeof timestamp === 'number') {
+          // 确保时间戳是有效的（检查是否为有限数字且不是NaN）
+          if (isFinite(timestamp) && !isNaN(timestamp)) {
+            // 转换为正确的日期对象
+            const date = new Date(timestamp);
+            
+            // 再次验证Date对象的有效性
+            if (!isNaN(date.getTime())) {
+              // 根据时间框架使用不同的格式化策略
+              if (timeframe.includes('m')) {
+                // 检查时间戳是否需要从秒转换为毫秒
+                // 通常API返回的Unix时间戳可能是秒级的，需要转换为毫秒级
+                let timestampMs = timestamp;
+                // 如果时间戳小于1e12，很可能是秒级时间戳，需要转换为毫秒
+                if (timestampMs < 1000000000000) {
+                  timestampMs = timestampMs * 1000;
+  
+                }
+                
+                // 使用转换后的时间戳创建Date对象
+                const correctedDate = new Date(timestampMs);
+                
+                // 分钟级别 - 使用本地时区并显示时分
+                const hours = correctedDate.getHours().toString().padStart(2, '0');
+                const minutes = correctedDate.getMinutes().toString().padStart(2, '0');
+                timeLabel = `${hours}:${minutes}`;
+                
+                // 对于1m和5m等小周期，每小时显示一次完整日期
+                if (minutes === '00') {
+                  const month = (correctedDate.getMonth() + 1).toString().padStart(2, '0');
+                  const day = correctedDate.getDate().toString().padStart(2, '0');
+                  timeLabel = `${month}/${day} ${hours}:00`;
+                }
+              } else if (timeframe.includes('h')) {
+                // 检查时间戳是否需要从秒转换为毫秒
+                let timestampMs = timestamp;
+                if (timestampMs < 1000000000000) {
+                  timestampMs = timestampMs * 1000;
+
+                }
+                const correctedDate = new Date(timestampMs);
+                
+                // 小时级别 - 显示月日和小时
+                const month = (correctedDate.getMonth() + 1).toString().padStart(2, '0');
+                const day = correctedDate.getDate().toString().padStart(2, '0');
+                const hours = correctedDate.getHours().toString().padStart(2, '0');
+                timeLabel = `${month}/${day} ${hours}:00`;
+              } else if (timeframe.includes('d')) {
+                // 检查时间戳是否需要从秒转换为毫秒
+                let timestampMs = timestamp;
+                if (timestampMs < 1000000000000) {
+                  timestampMs = timestampMs * 1000;
+
+                }
+                const correctedDate = new Date(timestampMs);
+                
+                // 日线级别 - 显示月日
+                const month = (correctedDate.getMonth() + 1).toString().padStart(2, '0');
+                const day = correctedDate.getDate().toString().padStart(2, '0');
+                timeLabel = `${month}/${day}`;
+              } else {
+                // 检查时间戳是否需要从秒转换为毫秒
+                let timestampMs = timestamp;
+                if (timestampMs < 1000000000000) {
+                  timestampMs = timestampMs * 1000;
+
+                }
+                const correctedDate = new Date(timestampMs);
+                
+                // 默认格式 - 使用更明确的格式
+                timeLabel = correctedDate.toLocaleString('zh-CN', {
+                  year: '2-digit',
+                  month: '2-digit',
+                  day: '2-digit',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                });
+              }
+              
+
+            } else {
+              timeLabel = `T${i}`;
+            }
+          } else {
+            console.log(`[DEBUG] 索引${index}的时间戳不是有效数字`);
+            timeLabel = `T${i}`;
+          }
+        } else {
+          // 时间戳不存在或不是数字类型
+          console.log(`[DEBUG] 索引${index}的时间戳不存在或类型错误`);
+          // 创建相对时间标签，使用距离当前的分钟数
+          const relativeMinutes = (klineData.length - 1 - index) * getMinutesFromTimeframe(timeframe);
+          timeLabel = `-${relativeMinutes}m`;
+        }
+      } catch (error) {
+        // 出错时显示索引和错误信息
+        console.log(`[DEBUG] 索引${index}时间格式化错误:`, error);
+        timeLabel = `#${index}`;
+      }
+    
+    // 辅助函数：根据时间框架获取分钟数
+    function getMinutesFromTimeframe(tf: string): number {
+      if (tf.includes('m')) {
+        return parseInt(tf.replace('m', '')) || 1;
+      } else if (tf.includes('h')) {
+        return (parseInt(tf.replace('h', '')) || 1) * 60;
+      } else if (tf.includes('d')) {
+        return (parseInt(tf.replace('d', '')) || 1) * 24 * 60;
+      }
+      return 1;
+    }
+    
+    // 使用旋转变换确保文本更好地显示，避免重叠
+      svgContent += `
+      <text x="${x}" y="${height - padding.bottom + 25}" text-anchor="middle" fill="#a0aec0" font-family="Arial" font-size="12" font-weight="bold" transform="rotate(-30, ${x}, ${height - padding.bottom + 25})">
         ${timeLabel}
       </text>
     `;
@@ -568,7 +730,7 @@ export async function runPatternAgent(imageBase64: string, symbol: string, timef
  */
 export async function getPatternAnalysis(
   symbol: string, 
-  timeframe: string = `${Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5")}m`
+  timeframe: string = "5m"
 ): Promise<{
   chart: string;
   analysis: string;

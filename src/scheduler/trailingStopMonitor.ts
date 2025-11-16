@@ -765,7 +765,7 @@ export function startTrailingStopMonitor() {
   // 每10秒执行一次
   monitorInterval = setInterval(() => {
     checkPeakPnlAndTrailingStop(autoCloseEnabled);
-  }, 10 * 1000);
+  }, 15 * 1000);
 }
 
 /**

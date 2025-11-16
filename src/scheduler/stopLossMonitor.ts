@@ -600,7 +600,7 @@ export function startStopLossMonitor() {
   // 每10秒执行一次
   monitorInterval = setInterval(() => {
     checkStopLoss();
-  }, 10 * 1000);
+  }, 30 * 1000);
 }
 
 /**

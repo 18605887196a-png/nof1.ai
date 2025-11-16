@@ -271,17 +271,20 @@ export async function createRiskAssessorAgent(marketDataContext?: any) {
 export async function createPatternRecognizerAgent(marketDataContext?: any) {
   const openai = await createOpenAIClientWithRotation();
 
-  // 获取交易间隔对应的时间框架
-  const intervalMinutes = Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5");
-  const timeframe = `${intervalMinutes}m`;
+  // 构建Agent指令 - 让AI智能选择时间框架
+  const instructions = `你是一名专业的交易形态分析师，专注于价格行为和市场结构分析。
 
-  // 添加时间框架信息到指令中
-  let timeframeInstruction = `当前使用的时间框架是：${timeframe}\n`;
+时间框架选择指南：
+你可以根据分析需要选择不同的时间框架：
+- 短期形态分析（1m, 5m）：适合日内交易和快速形态识别
+- 中期形态分析（15m, 1h）：适合波段交易和主要形态分析  
+- 长期形态分析（4h, 1d）：适合趋势分析和大型形态识别
 
-  // 不要直接从marketDataContext获取symbol，因为它包含所有符号的信息，应该由agent根据需要选择
-
-  // 构建Agent指令
-  const instructions = `${timeframeInstruction}你是一名专业的交易形态分析师，专注于价格行为和市场结构分析。
+请根据你的专业判断选择最合适的时间框架，考虑因素包括：
+- 当前市场波动性
+- 你关注的交易周期
+- 形态发育的时间跨度
+- 市场环境特点
 
 职责：
 - 识别K线图中的经典交易形态
@@ -302,6 +305,7 @@ export async function createPatternRecognizerAgent(marketDataContext?: any) {
 - 突破概率：高/中/低（基于结构强度）
 - 目标位测算：基于形态高度的合理区间
 - 风险提示：假突破的可能性和止损位置
+- 时间框架选择：说明你选择的时间框架及其理由
 
 注意：你专注于视觉模式识别，负责分析K线图中的形态并提供专业结论，避免生搬硬套标准形态`;
 

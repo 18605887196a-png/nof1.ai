@@ -33,6 +33,9 @@ import { initializeTerminalEncoding} from "./utils/encodingUtils";
 // 设置时区为中国时间（Asia/Shanghai，UTC+8）
 process.env.TZ = 'Asia/Shanghai';
 
+// 增加process事件监听器限制，避免MaxListenersExceededWarning警告
+process.setMaxListeners(20);
+
 // 初始化终端编码设置（解决Windows中文乱码问题）
 initializeTerminalEncoding();
 
@@ -80,11 +83,11 @@ async function main() {
   logger.info("启动账户资产记录器...");
   startAccountRecorder();
   
-  // 6. 启动移动止盈监控器（每10秒检查一次）
+  // 6. 启动移动止盈监控器（每15秒检查一次）
   logger.info("启动移动止盈监控器...");
   startTrailingStopMonitor();
   
-  // 7. 启动止损监控器（每10秒检查一次）
+  // 7. 启动止损监控器（每30秒检查一次）
   logger.info("启动止损监控器...");
   startStopLossMonitor();
   

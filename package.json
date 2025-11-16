@@ -82,6 +82,7 @@
     "chart.js": "^4.4.1",
     "dotenv": "^16.6.1",
     "gate-api": "^6.61.0",
+    "libsql": "^0.5.22",
     "node-cron": "^3.0.3",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.2",
