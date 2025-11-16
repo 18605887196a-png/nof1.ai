@@ -15,7 +15,7 @@ async function testPatternAnalysisTool() {
     // 设置测试参数
     const params = {
       symbol: 'BTC',
-      timeframe: '15m'
+      timeframe: '5m'
     };
     
     console.log(`测试参数: symbol=${params.symbol}, timeframe=${params.timeframe}`);
