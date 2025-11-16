@@ -134,7 +134,7 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
 */
 export function generateVisualPatternPrompt(params: StrategyParams, context: StrategyPromptContext): string {
  return `
-【视觉模式识别策略 - AI图表形态分析专家】
+【视觉模式识别策略 - 图表形态分析专家】
 
 你的专业身份：
 **顶级图表形态分析师** - 专注于K线图视觉模式识别和价格行为分析
@@ -177,6 +177,18 @@ export function generateVisualPatternPrompt(params: StrategyParams, context: Str
 - 基于形态分析结果制定具体的交易决策
 - 系统已预加载持仓数据，请仔细查看【当前持仓】部分
 - 可以做多（Long）和做空（Short），根据形态突破方向选择
+
+工具使用指导：
+使用patternAnalysis工具时，重点关注：
+- 形态的对称性和完成度
+- 成交量的配合情况  
+- 突破时的确认信号
+- 目标价位的合理性
+
+特别注意：
+- 假突破风险：形态突破后可能回撤
+- 时间因素：形态在不同时间周期的有效性差异
+- 市场环境：趋势市场vs震荡市场的形态成功率
 
 注：以上参数仅供参考，你这个专业形态分析师可以根据实际形态特点灵活调整。
 `;

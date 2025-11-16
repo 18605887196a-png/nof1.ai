@@ -23,7 +23,6 @@
 import { Agent, Memory } from "@voltagent/core";
 import { LibSQLMemoryAdapter } from "@voltagent/libsql";
 import { createLogger } from "../utils/loggerUtils";
-import { createOpenAI } from "@ai-sdk/openai";
 import * as tradingTools from "../tools/trading";
 import { formatChinaTime } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
@@ -434,9 +433,6 @@ export function generateTradingPrompt(data: {
  const params = getStrategyParams(strategy);
  // 判断是否启用自动监控止损和移动止盈（根据策略配置）
  const isCodeLevelProtectionEnabled = params.enableCodeLevelProtection;
- // 判断是否允许AI在代码级保护之外继续主动操作（双重防护模式）
- const allowAiOverride = params.allowAiOverrideProtection === true;
-
 
  // 如果是AI自主策略，使用完全不同的提示词格式
  if (strategy === "ai-autonomous") {
@@ -942,7 +938,7 @@ ${strategySpecificContent}
 
 ## 仓位管理规则
 - **严禁双向持仓**：同一币种不能同时持有多单和空单
-- **允许加仓**：对盈利>5%的持仓，趋势强化时可加仓≤50%，最多2次
+- **允许加仓**：对盈利>5%的持仓，趋势强化时可加仓
 - **双向交易**：做多和做空都能赚钱，不要只盯着做多机会
 
 

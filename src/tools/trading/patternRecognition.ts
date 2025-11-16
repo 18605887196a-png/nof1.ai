@@ -709,8 +709,8 @@ export async function runPatternAgent(imageBase64: string, symbol: string, timef
           ],
         },
       ],
-      max_tokens: 2048,
-      temperature: 0.4,
+      max_tokens: 8192
+      // temperature: 0.4,
     });
 
     const content = response.choices[0]?.message?.content?.trim();
