@@ -160,10 +160,10 @@ const patternAnalysisTool = tool({
       const finalTimeframe = timeframe || `${Number.parseInt(process.env.TRADING_INTERVAL_MINUTES || "5")}m`;
       const result = await getPatternAnalysis(symbol, finalTimeframe);
       
+      // 优化返回数据：只返回分析摘要，不返回base64图像数据
       return {
         symbol,
         timeframe: finalTimeframe,
-        chart: result.chart,
         analysis: result.analysis,
         timestamp: new Date().toISOString(),
         success: true
