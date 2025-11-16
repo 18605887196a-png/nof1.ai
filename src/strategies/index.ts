@@ -44,7 +44,8 @@ export { getBalancedStrategy, generateBalancedPrompt } from "./balanced";       
 export { getAggressiveStrategy, generateAggressivePrompt } from "./aggressive";        // 激进策略
 export { getRebateFarmingStrategy, generateRebateFarmingPrompt } from "./rebateFarming";  // 返佣套利策略
 export { getAiAutonomousStrategy, generateAiAutonomousPrompt } from "./aiAutonomous";  // AI自主策略
-export { getMultiAgentConsensusStrategy, generateMultiAgentConsensusPrompt } from "./multiAgentConsensus";  // 多Agent共识策略
+export { getMultiAgentConsensusStrategy, generateMultiAgentConsensusPrompt } from "./multiAgentConsensus";
+export { getVisualPatternStrategy, generateVisualPatternPrompt } from "./visualPattern";  // 多Agent共识策略
 
 import type { TradingStrategy, StrategyParams, StrategyPromptContext } from "./types";
 import { getUltraShortStrategy, generateUltraShortPrompt } from "./ultraShort";
@@ -55,6 +56,7 @@ import { getAggressiveStrategy, generateAggressivePrompt } from "./aggressive";
 import { getRebateFarmingStrategy, generateRebateFarmingPrompt } from "./rebateFarming";
 import { getAiAutonomousStrategy, generateAiAutonomousPrompt } from "./aiAutonomous";
 import { getMultiAgentConsensusStrategy, generateMultiAgentConsensusPrompt } from "./multiAgentConsensus";
+import { getVisualPatternStrategy, generateVisualPatternPrompt } from "./visualPattern";
 
 /**
  * 获取策略参数（基于 MAX_LEVERAGE 动态计算）
@@ -92,6 +94,8 @@ export function getStrategyParams(strategy: TradingStrategy, maxLeverage: number
       return getAiAutonomousStrategy(maxLeverage);
     case "multi-agent-consensus":
       return getMultiAgentConsensusStrategy(maxLeverage);
+    case "visual-pattern":
+      return getVisualPatternStrategy(maxLeverage);
     default:
       return getAiAutonomousStrategy(maxLeverage);
   }
@@ -144,6 +148,8 @@ export function generateStrategySpecificPrompt(
       return generateAiAutonomousPrompt(params, context);
     case "multi-agent-consensus":
       return generateMultiAgentConsensusPrompt(params, context);
+    case "visual-pattern":
+      return generateVisualPatternPrompt(params, context);
     default:
       return generateAiAutonomousPrompt(params, context);
   }

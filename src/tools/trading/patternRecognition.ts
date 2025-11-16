@@ -90,7 +90,7 @@ export async function generateCandlestickChart(
     const indicators = calculateIndicators(candles);
     
     // 格式化K线数据，提取必要的价格信息和时间戳
-    const formattedKlines = candles.map(candle => ({
+    const formattedKlines = candles.map((candle: any) => ({
       open: parseFloat(candle.o),
       high: parseFloat(candle.h),
       low: parseFloat(candle.l),
@@ -111,7 +111,7 @@ export async function generateCandlestickChart(
     
   } catch (error) {
     logger.error("生成K线图失败:", error);
-    throw new Error(`生成K线图失败: ${error.message}`);
+    throw new Error(`生成K线图失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -207,7 +207,7 @@ async function savePngToLocal(buffer: Buffer, symbol: string, timeframe: string)
     return filePath;
   } catch (error) {
     logger.error("PNG文件保存失败:", error);
-    throw new Error(`PNG文件保存失败: ${error.message}`);
+    throw new Error(`PNG文件保存失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -223,7 +223,7 @@ async function convertSvgToPngFile(svgContent: string, symbol: string, timeframe
     return await savePngToLocal(buffer, symbol, timeframe);
   } catch (error) {
     logger.error("SVG到PNG文件转换失败:", error);
-    throw new Error(`PNG文件保存失败: ${error.message}`);
+    throw new Error(`PNG文件保存失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -233,12 +233,7 @@ async function convertSvgToPngFile(svgContent: string, symbol: string, timeframe
 async function convertSvgToPng(svgContent: string, symbol?: string, timeframe?: string): Promise<string> {
   try {
     // 提高图像质量设置（与SVG绘制分辨率保持一致）
-    const buffer = await svg2imgAsync(svgContent, {
-      format: 'png',
-      quality: 100, // 最高质量
-      width: 1600,  // 高清分辨率（与SVG绘制保持一致）
-      height: 1000
-    });
+    const buffer = await svg2imgAsync(svgContent);
     
     // 如果启用了本地文件保存，同时保存到本地
     if (shouldSaveLocalFile() && symbol && timeframe) {
@@ -315,7 +310,7 @@ async function generateCandlestickChartImage(data: any, symbol: string, timefram
     logger.error("生成K线图图像失败:", error);
     
     // 如果图像生成失败，直接抛出错误，避免浪费API调用
-    throw new Error(`K线图生成失败: ${error.message}`);
+    throw new Error(`K线图生成失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -454,19 +449,19 @@ function drawCandlestickSVG(
     let timeLabel = '';
     if (timeframe.includes('m')) {
       // 分钟级别
-      const date = new Date(candle.timestamp);
+      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
       timeLabel = `${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`;
     } else if (timeframe.includes('h')) {
       // 小时级别
-      const date = new Date(candle.timestamp);
+      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
       timeLabel = `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:00`;
     } else if (timeframe.includes('d')) {
       // 日线级别
-      const date = new Date(candle.timestamp);
+      const date = candle.timestamp ? new Date(candle.timestamp) : new Date();
       timeLabel = `${date.getMonth() + 1}/${date.getDate()}`;
     } else {
       // 默认显示时间戳
-      timeLabel = new Date(candle.timestamp).toLocaleTimeString();
+      timeLabel = candle.timestamp ? new Date(candle.timestamp).toLocaleTimeString() : 'N/A';
     }
     
     svgContent += `
@@ -564,7 +559,7 @@ export async function runPatternAgent(imageBase64: string, symbol: string, timef
     
   } catch (error) {
     logger.error("模式识别分析失败:", error);
-    throw new Error(`模式识别分析失败: ${error.message}`);
+    throw new Error(`模式识别分析失败: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
@@ -595,7 +590,7 @@ export async function getPatternAnalysis(
     // 返回有意义的错误信息，而不是抛出异常
     return {
       chart: "",
-      analysis: `模式识别分析失败: ${error.message}. 可能原因：数据获取异常、K线图生成失败。建议检查数据源连接或稍后重试。`
+      analysis: `模式识别分析失败: ${error instanceof Error ? error.message : String(error)}. 可能原因：数据获取异常、K线图生成失败。建议检查数据源连接或稍后重试。`
     };
   }
 }

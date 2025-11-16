@@ -788,7 +788,7 @@ export const scientificTrendlineAnalysisTool = createTool({
 
 
 
-           const prices = klines.map(k => parseFloat(k.c)).filter(p => !isNaN(p) && p > 0);
+           const prices = klines.map((k: any) => parseFloat(k.c)).filter((p: number) => !isNaN(p) && p > 0);
            const currentPrice = prices[prices.length - 1];
 
 

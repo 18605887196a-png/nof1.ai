@@ -29,7 +29,7 @@
  * - ai-autonomous: AI自主策略，完全由AI主导，不提供任何策略建议
  * - multi-agent-consensus: 陪审团
  */
-export type TradingStrategy = "conservative" | "balanced" | "aggressive" | "ultra-short" | "swing-trend" | "rebate-farming" | "ai-autonomous" | "multi-agent-consensus";
+export type TradingStrategy = "conservative" | "balanced" | "aggressive" | "ultra-short" | "swing-trend" | "rebate-farming" | "ai-autonomous" | "multi-agent-consensus" | "visual-pattern";
 
 /**
  * 策略提示词生成上下文

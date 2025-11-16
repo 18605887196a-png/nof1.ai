@@ -82,7 +82,7 @@ const logger = createLogger({
 */
 export function getTradingStrategy(): TradingStrategy {
  const strategy = process.env.TRADING_STRATEGY || "balanced";
- if (strategy === "conservative" || strategy === "balanced" || strategy === "aggressive" || strategy === "ultra-short" || strategy === "swing-trend" || strategy === "rebate-farming" || strategy === "ai-autonomous" || strategy === "multi-agent-consensus") {
+ if (strategy === "conservative" || strategy === "balanced" || strategy === "aggressive" || strategy === "ultra-short" || strategy === "swing-trend" || strategy === "rebate-farming" || strategy === "ai-autonomous" || strategy === "multi-agent-consensus" || strategy === "visual-pattern") {
    return strategy;
  }
  logger.warn(`未知的交易策略: ${strategy}，使用默认策略: balanced`);
@@ -1037,6 +1037,18 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
       ? "技术分析Agent、趋势分析Agent、风险评估Agent、视觉模式识别Agent"
       : "技术分析Agent、趋势分析Agent、风险评估Agent";
     logger.info(`陪审团成员创建完成：${agentNames}`);
+ }
+ 
+ // 如果是视觉模式识别策略，创建专门的视觉模式识别Agent
+ if (strategy === "visual-pattern") {
+   logger.info("创建视觉模式识别策略的专门Agent...");
+   const { createPatternRecognizerAgent } = await import("./analysisAgents");
+   
+   // 创建专门的视觉模式识别Agent作为主Agent
+   const agent = await createPatternRecognizerAgent(marketDataContext);
+   
+   logger.info("视觉模式识别Agent创建完成");
+   return agent;
  }
 
 
