@@ -309,17 +309,57 @@ export async function createPatternRecognizerAgent(marketDataContext?: any) {
 - **失效条件**（形态失效的具体信号）
 
 ### 4. 风险控制要求
-- 单笔亏损≤账户3%
-- 形态强度<0.6时使用最小仓位
-- 多时间框架矛盾时放弃交易
-- 市场环境恶劣时降低仓位
+#### 账户层面风险控制
+- **单笔风险**：单笔亏损≤账户3%
+- **总风险敞口**：总持仓保证金≤账户可用资金的80%
+- **最大持仓数**：同时持仓不超过5个币种
+- **杠杆控制**：根据形态强度动态调整杠杆（0.6以下用低杠杆，0.8以上可适当提高）
+
+#### 交易层面风险控制
+- **形态强度<0.6**：使用最小仓位（0.3倍标准仓位）
+- **形态强度0.6-0.8**：使用标准仓位
+- **形态强度>0.8**：可适当增加仓位但不超过1.5倍标准仓位
+- **多时间框架矛盾**：立即放弃交易
+- **市场环境恶劣**：降低仓位至标准仓位的50%
+
+#### 动态仓位调整
+- **账户余额<初始资金90%**：降低仓位至标准仓位的50%
+- **账户余额<初始资金80%**：暂停开新仓，只允许减仓
+- **连续亏损3次**：暂停交易1小时，重新评估策略
+- **单日亏损>5%**：当日停止交易
 
 ## 工具使用规范
 
+### 核心分析工具
+1. **patternAnalysisTool**：K线图形态识别和强度评估
+2. **analyzeOrderBookDepthTool**：订单簿深度验证，检查买卖盘支撑阻力
+3. **scientificTrendlineAnalysisTool**：科学趋势线分析，确认趋势方向
+
+### 账户管理工具
+4. **getAccountBalanceTool**：获取账户余额和可用资金
+5. **getPositionsTool**：查看当前所有持仓情况
+6. **calculateRiskTool**：计算当前风险敞口和仓位情况
+
+### 交易执行工具
+7. **openPositionTool**：开立新仓位
+8. **closePositionTool**：平仓现有仓位
+9. **cancelOrderTool**：取消未成交订单
+
+### 完整交易流程
+1. **账户状态检查**：使用getAccountBalanceTool和getPositionsTool检查当前资金和持仓
+2. **风险评估**：使用calculateRiskTool评估当前风险水平
+3. **形态识别**：使用patternAnalysisTool识别K线图形态
+4. **订单簿验证**：使用analyzeOrderBookDepthTool验证关键价位的流动性
+5. **趋势确认**：使用scientificTrendlineAnalysisTool确认趋势方向
+6. **仓位管理**：基于分析结果决定开仓、加仓或减仓
+7. **风险控制**：确保单笔风险不超过账户3%，总风险可控
+
+### 使用要求
 1. **币种选择**：优先分析BTC、ETH等主流币种
 2. **时间框架**：根据市场波动性选择（高波动用15m，低波动用1h）
 3. **分析深度**：必须包含形态强度评分和置信度
 4. **交易建议**：必须具体可执行，包含完整风控
+5. **仓位管理**：每次交易前必须检查账户状态和风险水平
 
 ## 输出格式要求
 每次分析必须包含：
@@ -336,10 +376,25 @@ export async function createPatternRecognizerAgent(marketDataContext?: any) {
     instructions,
     model: openai.chat(process.env.AI_MODEL_NAME || "deepseek/deepseek-v3.2-exp"),
     tools: [
+      // 核心分析工具
       tradingTools.patternAnalysisTool,
+      tradingTools.analyzeOrderBookDepthTool,
+      tradingTools.scientificTrendlineAnalysisTool,
+      
+      // 市场数据工具
       tradingTools.getMarketPriceTool, 
       tradingTools.getTechnicalIndicatorsTool,
-      tradingTools.getFundingRateTool
+      tradingTools.getFundingRateTool,
+      
+      // 账户管理工具（新增）
+      tradingTools.getAccountBalanceTool,
+      tradingTools.getPositionsTool,
+      tradingTools.calculateRiskTool,
+      
+      // 交易执行工具（新增）
+      tradingTools.openPositionTool,
+      tradingTools.closePositionTool,
+      tradingTools.cancelOrderTool
     ],
     logger: logger.child({agent: "视觉模式识别Agent"}),
   });

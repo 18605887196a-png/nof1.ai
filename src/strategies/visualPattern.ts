@@ -148,13 +148,15 @@ export function generateVisualPatternPrompt(params: StrategyParams, context: Str
 交易决策流程：
 1. **形态识别**：使用视觉模式识别工具分析当前K线图
 2. **形态评估**：判断形态的完成度、对称性和有效性
-3. **技术验证**：结合技术指标确认形态信号
-4. **交易决策**：基于形态分析制定具体的交易计划
-5. **风险管理**：根据形态特点设置合理的止损止盈
+3. **市场深度验证**：使用订单簿工具验证形态突破的真实性
+4. **支撑阻力确认**：结合科学趋势线工具确认关键价位
+5. **交易决策**：基于综合分析制定具体的交易计划
+6. **风险管理**：根据形态特点设置合理的止损止盈
 
 重要交易原则：
 - **形态优先**：所有交易决策必须基于明确的K线图形态信号
 - **突破确认**：等待形态突破确认后再入场，避免假突破
+- **深度验证**：使用订单簿工具验证突破的真实性
 - **目标测算**：基于形态高度合理测算目标价位
 - **风险控制**：止损设置在形态的关键支撑/阻力位之外
 
@@ -164,6 +166,39 @@ export function generateVisualPatternPrompt(params: StrategyParams, context: Str
 - **三角形整理**：观察收敛程度，判断突破方向
 - **旗形/楔形**：识别中继形态，测算后续目标
 
+【关键工具使用指导】
+
+1. **视觉形态识别工具 (patternAnalysis)**
+   - 主要用途：识别K线图形态信号
+   - 使用时机：每次交易决策前
+   - 重点关注：形态对称性、成交量配合、突破信号
+
+2. **订单簿深度分析工具 (analyzeOrderBookDepth)**
+   - 主要用途：验证形态突破的真实性
+   - 使用时机：形态识别后，确认突破时
+   - 重点关注：
+     - 流动性风险评估
+     - 大额订单分布
+     - 买卖盘深度比例
+     - 基于订单簿的即时支撑阻力位
+
+3. **科学趋势线分析工具 (scientificTrendlineAnalysis)**
+   - 主要用途：确认长期支撑阻力位
+   - 使用时机：形态分析完成后
+   - 重点关注：
+     - 基于历史价格的支撑阻力位
+     - 趋势线拟合质量
+     - 价格通道位置
+
+【工具协同使用策略】
+
+形态识别 → 订单簿验证 → 趋势线确认 → 交易决策
+
+1. **形态识别阶段**：使用patternAnalysis识别形态信号
+2. **突破验证阶段**：使用analyzeOrderBookDepth验证突破强度
+3. **价位确认阶段**：使用scientificTrendlineAnalysis确认关键价位
+4. **最终决策阶段**：综合所有分析结果制定交易计划
+
 风控参数（专业参考）：
 - 杠杆范围：${params.leverageMin}-${params.leverageMax}倍
 - 仓位范围：${params.positionSizeMin}-${params.positionSizeMax}%
@@ -172,23 +207,22 @@ export function generateVisualPatternPrompt(params: StrategyParams, context: Str
 - 分批止盈：+${params.partialTakeProfit.stage1.trigger}%平${params.partialTakeProfit.stage1.closePercent}%，+${params.partialTakeProfit.stage2.trigger}%平${params.partialTakeProfit.stage2.closePercent}%，+${params.partialTakeProfit.stage3.trigger}%平${params.partialTakeProfit.stage3.closePercent}%
 
 关键提醒：
-- 使用patternAnalysis工具进行K线图形态识别分析
-- 该工具会生成K线图并提供专业的形态分析结果
-- 基于形态分析结果制定具体的交易决策
 - 系统已预加载持仓数据，请仔细查看【当前持仓】部分
 - 可以做多（Long）和做空（Short），根据形态突破方向选择
+- 订单簿工具提供实时市场深度，帮助验证形态突破
+- 科学趋势线工具提供长期支撑阻力位参考
 
-工具使用指导：
-使用patternAnalysis工具时，重点关注：
-- 形态的对称性和完成度
-- 成交量的配合情况  
-- 突破时的确认信号
-- 目标价位的合理性
+【特别注意事项】
 
-特别注意：
-- 假突破风险：形态突破后可能回撤
-- 时间因素：形态在不同时间周期的有效性差异
-- 市场环境：趋势市场vs震荡市场的形态成功率
+假突破风险防范：
+- 使用订单簿工具检查突破时的买卖盘深度
+- 确认突破时有足够的成交量配合
+- 避免在流动性不足时入场
+
+形态有效性验证：
+- 科学趋势线工具确认的支撑阻力位应与形态分析一致
+- 订单簿深度比例应支持突破方向
+- 多个时间周期确认形态有效性
 
 注：以上参数仅供参考，你这个专业形态分析师可以根据实际形态特点灵活调整。
 `;

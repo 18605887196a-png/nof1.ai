@@ -466,7 +466,7 @@ export const analyzeFundingRateTrendTool = createTool({
  */
 export const analyzeOrderBookDepthTool = createTool({
   name: "analyzeOrderBookDepth",
-  description: "分析指定币种的订单簿深度，包括流动性、支撑阻力位、大额订单等",
+  description: "分析指定币种的订单簿深度，包括流动性评估、大额订单识别和基于订单簿的即时支撑阻力位。核心功能：实时订单簿深度分析、流动性风险评估、大额挂单识别、基于订单簿的即时支撑阻力位、清算价位估算。技术特点：实时反映市场深度、基于大额挂单识别关键价位、流动性风险评估、买卖盘失衡分析。适用场景：短线交易决策、突破确认、流动性风险评估、即时市场深度分析。",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
     depthLimit: z.number().default(50).describe("深度档位数量，默认50档"),

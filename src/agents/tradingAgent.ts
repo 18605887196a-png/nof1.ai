@@ -974,6 +974,12 @@ ${strategySpecificContent}
 - getMarketPrice、getTechnicalIndicators、getFundingRate、getOrderBook
 
 
+## 高级分析工具
+- analyzeOrderBookDepth（订单簿深度分析）
+- scientificTrendlineAnalysis（科学趋势线分析）
+- patternAnalysis（K线图形态识别）
+
+
 ## 持仓管理工具
 - openPosition（市价单）、closePosition（市价单）、cancelOrder
 
@@ -1040,7 +1046,7 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
    logger.info("创建视觉模式识别策略的专门Agent...");
    const { createPatternRecognizerAgent } = await import("./analysisAgents");
    
-   // 创建专门的视觉模式识别Agent作为主Agent
+   // 创建专门的视觉模式识别Agent
    const agent = await createPatternRecognizerAgent(marketDataContext);
    
    logger.info("视觉模式识别Agent创建完成");
@@ -1057,6 +1063,8 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
      tradingTools.getTechnicalIndicatorsTool,
      tradingTools.getFundingRateTool,
      tradingTools.getOrderBookTool,
+     tradingTools.analyzeOrderBookDepthTool,
+     tradingTools.scientificTrendlineAnalysisTool,
      tradingTools.openPositionTool,
      tradingTools.closePositionTool,
      tradingTools.cancelOrderTool,
