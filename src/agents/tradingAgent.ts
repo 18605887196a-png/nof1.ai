@@ -465,9 +465,11 @@ export function generateTradingPrompt(data: {
 `;
 
    // 视觉分析：展示更丰富的市场数据以辅助形态识别
+   prompt += `*15分钟实时市场数据 + 5m/1h多时间框架共振分析*\n\n`;
+   
    for (const [symbol, dataRaw] of Object.entries(marketData)) {
      const data = dataRaw as any;
-     prompt += `### ${symbol}
+     prompt += `### ${symbol} (15分钟时间框架)
 价格: ${data.price.toFixed(1)} | EMA20: ${data.ema20.toFixed(3)} | EMA50: ${data.ema50.toFixed(3)} | MACD: ${data.macd.toFixed(3)} | RSI7: ${data.rsi7.toFixed(0)} | RSI14: ${data.rsi14.toFixed(0)}`;
      
      // 布林带辅助视觉定位
@@ -481,7 +483,29 @@ export function generateTradingPrompt(data: {
        prompt += ` | 成交量: ${(data.volume / 1000).toFixed(0)}K`;
      }
      
-     prompt += `\n\n`;
+     prompt += `\n`;
+  
+     // 多时间框架数据（视觉分析重要参考）
+     if (data.timeframes) {
+       // 只显示5m和1h，避免与15分钟实时数据重复
+       const keyTfs = ['5m', '1h'];
+       let tfData = [];
+      
+       for (const tf of keyTfs) {
+         const tfInfo = data.timeframes[tf];
+         if (tfInfo) {
+           // 简洁格式：时间框架 + 关键指标
+           tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA20${tfInfo.ema20.toFixed(2)} | RSI7${tfInfo.rsi7?.toFixed(0) || 'N/A'}`);
+         }
+       }
+      
+       if (tfData.length > 0) {
+         prompt += `多时间框架共振分析：\n`;
+         prompt += `  ${tfData.join('\n  ')}\n`;
+       }
+     }
+     
+     prompt += `\n`;
    }
 
    // 简洁的账户和持仓信息
