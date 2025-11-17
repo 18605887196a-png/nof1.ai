@@ -485,17 +485,17 @@ export function generateTradingPrompt(data: {
      
      prompt += `\n`;
   
-     // 多时间框架数据（视觉分析重要参考）
+     // 多时间框架数据（共振分析重要参考）
      if (data.timeframes) {
-       // 只显示5m和1h，避免与15分钟实时数据重复
-       const keyTfs = ['5m', '1h'];
+       // 包含5m/15m/1h三个周期进行共振分析
+       const keyTfs = ['5m', '15m', '1h'];
        let tfData = [];
       
        for (const tf of keyTfs) {
          const tfInfo = data.timeframes[tf];
          if (tfInfo) {
-           // 简洁格式：时间框架 + 关键指标
-           tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA20${tfInfo.ema20.toFixed(2)} | RSI7${tfInfo.rsi7?.toFixed(0) || 'N/A'}`);
+           // 格式化指标，确保空格和冒号正确
+           tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA20: ${tfInfo.ema20.toFixed(2)} | MACD: ${tfInfo.macd.toFixed(3)} | RSI7: ${tfInfo.rsi7?.toFixed(0) || 'N/A'}`);
          }
        }
       
