@@ -140,8 +140,28 @@ async function collectMarketData() {
      // 计算1小时指标作为更长期上下文
      const longerTermContext = calculateLongerTermContext(candles1h);
     
-     // 使用5分钟K线数据作为主要指标（兼容性）
-     const indicators = indicators5m;
+     // 智能时间框架选择：根据交易策略动态选择主要分析周期
+     // 视觉模式识别策略：优先使用1小时周期（趋势确认，过滤噪声）
+     // 激进策略：使用30m或1h确认趋势  
+     // 超短线策略：可使用5m+15m多周期共振
+     const strategy = process.env.TRADING_STRATEGY || 'visual-pattern';
+     let primaryTimeframe = '5m';
+     
+     switch(strategy) {
+        case 'visual-pattern':
+          primaryTimeframe = '15m'; // 15分钟：平衡趋势确认和信号频率，最适合日内交易
+          break;
+        default:
+          primaryTimeframe = '5m'; // 平衡选择15分钟
+      }
+     
+     const indicators = {
+       ...(primaryTimeframe === '1h' ? indicators1h : 
+          primaryTimeframe === '15m' ? indicators15m :
+          primaryTimeframe === '5m' ? indicators5m : indicators5m)
+     };
+     
+     logger.debug(`${symbol} 使用${primaryTimeframe}周期数据作为主要指标，策略：${strategy}`);
     
      // 验证技术指标有效性和数据完整性
      const dataTimestamp = getChinaTimeISO();
@@ -1657,7 +1677,7 @@ async function executeTradingDecision() {
    logger.info(prompt);
    logger.info("=".repeat(80) + "\n");
   
-   // 传递市场数据给Agent（用于子Agent）
+
    const agent = await createTradingAgent(intervalMinutes, marketData);
   
    try {

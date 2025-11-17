@@ -18,8 +18,8 @@
 
 
 /**
-* 交易 Agent 配置（极简版）
-*/
+ * 交易 Agent 配置（极简版）
+ */
 import { Agent, Memory } from "@voltagent/core";
 import { LibSQLMemoryAdapter } from "@voltagent/libsql";
 import { createLogger } from "../utils/loggerUtils";
@@ -439,6 +439,100 @@ export function generateTradingPrompt(data: {
    return generateAiAutonomousPromptForCycle(data);
  }
 
+ // 如果是视觉模式策略，使用专门的提示词格式
+ if (strategy === "visual-pattern") {
+   return generateVisualPatternPromptForCycle(data);
+ }
+
+ // 视觉模式策略专用提示词生成函数 - 作为Agent指令的补充
+ function generateVisualPatternPromptForCycle(data: any): string {
+  const { minutesElapsed, iteration, intervalMinutes, marketData, accountInfo, positions, tradeHistory, recentDecisions } = data;
+  const currentTime = formatChinaTime();
+  const params = getStrategyParams(strategy);
+
+   let prompt = `# 视觉模式识别交易周期 #${iteration} | ${currentTime} | 周期: ${intervalMinutes}分钟
+
+### 角色定位
+
+**你是一名专业的视觉模式识别交易员，负责基于当前市场数据进行形态分析并提供交易决策指导**
+
+### 🚨 执行优先级提醒 🚨
+作为视觉模式识别交易员，你需要基于本提示提供的市场数据和交易规则，进行形态识别分析并提供交易决策建议。本提示将提供必要的市场信息、账户状态和交易规则指导。
+
+**最高优先级指导原则：** 当识别到A级信号（≥7分）时，应优先建议执行开仓操作，不得仅停留在分析层面！
+
+## 当前市场数据
+`;
+
+   // 视觉分析：展示更丰富的市场数据以辅助形态识别
+   for (const [symbol, dataRaw] of Object.entries(marketData)) {
+     const data = dataRaw as any;
+     prompt += `### ${symbol}
+价格: ${data.price.toFixed(1)} | EMA20: ${data.ema20.toFixed(3)} | EMA50: ${data.ema50.toFixed(3)} | MACD: ${data.macd.toFixed(3)} | RSI7: ${data.rsi7.toFixed(0)} | RSI14: ${data.rsi14.toFixed(0)}`;
+     
+     // 布林带辅助视觉定位
+     if (data.bbUpper && data.bbMiddle && data.bbLower) {
+       const bbPosition = data.bbPosition?.toFixed(0) || '50';
+       prompt += ` | 布林带[${data.bbLower.toFixed(2)},${data.bbMiddle.toFixed(2)},${data.bbUpper.toFixed(2)}] 位置:${bbPosition}%`;
+     }
+     
+     // 成交量确认（视觉分析重要参考）
+     if (data.volume !== undefined) {
+       prompt += ` | 成交量: ${(data.volume / 1000).toFixed(0)}K`;
+     }
+     
+     prompt += `\n\n`;
+   }
+
+   // 简洁的账户和持仓信息
+   prompt += `## 账户状态
+总资产: ${accountInfo.totalBalance.toFixed(2)} USDT | 可用: ${accountInfo.availableBalance.toFixed(1)} | 收益率: ${accountInfo.returnPercent.toFixed(2)}%
+
+`;
+
+   // 当前持仓
+   if (positions.length > 0) {
+     prompt += `## 当前持仓
+`;
+     for (const pos of positions) {
+       const priceChangePercent = pos.entry_price > 0
+         ? ((pos.current_price - pos.entry_price) / pos.entry_price * 100 * (pos.side === 'long' ? 1 : -1))
+         : 0;
+       const pnlPercent = priceChangePercent * pos.leverage;
+       prompt += `${pos.symbol} ${pos.side === 'long' ? '多' : '空'} ${pos.leverage}x | 盈亏: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%
+`;
+     }
+     prompt += `
+`;
+   }
+
+   // 最近决策记录
+   if (recentDecisions && recentDecisions.length > 0) {
+     prompt += `## 最近决策
+`;
+     const lastDecision = recentDecisions[0];
+     prompt += `上次决策时间: ${formatChinaTime(new Date(lastDecision.created_at))}
+上次决策内容: ${lastDecision.decision_text.substring(0, 200)}${lastDecision.decision_text.length > 200 ? '...' : ''}
+
+`;
+   }
+
+   // 核心交易职责（请参考Agent指令中的详细规则）
+   prompt += `## 核心交易职责
+
+**重要提醒**：请严格遵循你的Agent指令中定义的详细执行流程和分析规则。
+
+**核心执行要点**：
+- 识别到A级信号（≥7分）时必须立即执行开仓操作
+- 严格控制在策略定义的杠杆和仓位范围内
+- 严格执行止损纪律，单笔最大亏损≤${RISK_PARAMS.EXTREME_STOP_LOSS_PERCENT}%
+- 优先处理持仓管理和风险控制，再寻找新开仓机会
+
+现在，请基于详细的市场数据进行综合分析并做出交易决策。`;
+
+   return prompt;
+ }
+
  // 生成专业交易原则框架
 const generateTradingPrinciples = () => {
  return `【专业交易原则】
@@ -811,26 +905,6 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 现在，请基于每个周期提供的市场数据，先进行自我复盘，然后再做出交易决策。`;
  }
-
-
- // 判断是否启用自动监控止损和移动止盈（根据策略配置）
- const isCodeLevelProtectionEnabled = params.enableCodeLevelProtection;
-
-
- // 生成止损规则描述（基于 stopLoss 配置和杠杆范围）
- const generateStopLossDescriptions = () => {
-   const levMin = params.leverageMin;
-   const levMax = params.leverageMax;
-   const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
-   const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
-   return [
-     `${levMin}-${lowThreshold}倍杠杆，亏损 ${params.stopLoss.low}% 时止损`,
-     `${lowThreshold + 1}-${midThreshold}倍杠杆，亏损 ${params.stopLoss.mid}% 时止损`,
-     `${midThreshold + 1}倍以上杠杆，亏损 ${params.stopLoss.high}% 时止损`,
-   ];
- };
- const stopLossDescriptions = generateStopLossDescriptions();
-
 
  // 构建策略提示词上下文
  const promptContext: StrategyPromptContext = {
