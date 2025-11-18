@@ -837,21 +837,6 @@ export const scientificTrendlineAnalysisTool = createTool({
 
 
 
-           // 提取关键价位（不再强制修正，相信科学算法）
-           const keyLevels = {
-               support: supportLines.map(line => {
-                   const price = line.slope * (prices.length - 1) + line.intercept;
-                   return parseFloat(price.toFixed(2));
-               }),
-               resistance: resistanceLines.map(line => {
-                   const price = line.slope * (prices.length - 1) + line.intercept;
-                   return parseFloat(price.toFixed(2));
-               }),
-           };
-
-
-
-
            // 科学分析市场趋势
            const {direction, strength, breakoutSignal} = analyzeMarketTrend(
                prices,
