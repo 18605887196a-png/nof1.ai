@@ -666,17 +666,16 @@ function generateVisualPatternPromptForCycle(data: any): string {
        const decisionText: string = lastDecision.decision || "无决策内容";
 
 
-       // 提取从"总体结论"开始到文本结束的所有内容，不做任何截断
-        let keyDecisionInfo = decisionText;
+       // 只保留从"总体结论"开始到文本结束的内容
+        let displayText = "无决策内容";
         
         // 尝试提取从"总体结论"开始到文本结束的所有内容
-        const conclusionMatch = decisionText.match(/## 总体结论[\s\S]*$/);
+        const conclusionMatch = decisionText.match(/总体结论[\s\S]*$/);
         if (conclusionMatch) {
-            keyDecisionInfo = conclusionMatch[0];
+            displayText = conclusionMatch[0];
+        } else if (decisionText) {
+            displayText = decisionText; // 如果没有找到"总体结论"，则使用完整文本作为备选
         }
-        
-        // 直接使用提取的完整内容，不做任何截断
-        const displayText = keyDecisionInfo;
        
        prompt += `## 四、最近一次决策摘要
 
