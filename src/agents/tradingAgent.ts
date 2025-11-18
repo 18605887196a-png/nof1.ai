@@ -494,8 +494,26 @@ export function generateTradingPrompt(data: {
        for (const tf of keyTfs) {
          const tfInfo = data.timeframes[tf];
          if (tfInfo) {
-           // 格式化指标，确保空格和冒号正确
-           tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA20: ${tfInfo.ema20.toFixed(2)} | MACD: ${tfInfo.macd.toFixed(3)} | RSI7: ${tfInfo.rsi7?.toFixed(0) || 'N/A'}`);
+           // 丰富指标展示，包含更多有价值的共振分析指标
+           let indicators = [];
+           indicators.push(`价格${tfInfo.currentPrice.toFixed(2)}`);
+           indicators.push(`EMA20: ${tfInfo.ema20?.toFixed(2) || 'N/A'}`);
+           indicators.push(`EMA50: ${tfInfo.ema50?.toFixed(2) || 'N/A'}`);
+           indicators.push(`MACD: ${tfInfo.macd?.toFixed(3) || 'N/A'}`);
+           indicators.push(`RSI7: ${tfInfo.rsi7?.toFixed(0) || 'N/A'}`);
+           indicators.push(`RSI14: ${tfInfo.rsi14?.toFixed(0) || 'N/A'}`);
+           
+           // 如果有布林带数据也加入
+           if (tfInfo.bbUpper && tfInfo.bbMiddle && tfInfo.bbLower) {
+             indicators.push(`布林: [${tfInfo.bbLower.toFixed(2)},${tfInfo.bbMiddle.toFixed(2)},${tfInfo.bbUpper.toFixed(2)}]`);
+           }
+           
+           // 成交量确认
+           if (tfInfo.volume !== undefined) {
+             indicators.push(`量: ${(tfInfo.volume / 1000).toFixed(0)}K`);
+           }
+           
+           tfData.push(`${tf}周期: ${indicators.join(' | ')}`);
          }
        }
       
@@ -535,8 +553,9 @@ export function generateTradingPrompt(data: {
      prompt += `## 最近决策
 `;
      const lastDecision = recentDecisions[0];
+     const decisionText = lastDecision.decision_text || '无决策内容';
      prompt += `上次决策时间: ${formatChinaTime(new Date(lastDecision.created_at))}
-上次决策内容: ${lastDecision.decision_text.substring(0, 200)}${lastDecision.decision_text.length > 200 ? '...' : ''}
+上次决策内容: ${decisionText.substring(0, 200)}${decisionText.length > 200 ? '...' : ''}
 
 `;
    }

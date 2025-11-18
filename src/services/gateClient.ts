@@ -63,7 +63,7 @@ export class GateClient {
   /**
    * 获取合约ticker价格（带重试机制）
    */
-  async getFuturesTicker(contract: string, retries: number = 2) {
+  async getFuturesTicker(contract: string, retries: number = 3) {
     let lastError: any;
     
     for (let i = 0; i <= retries; i++) {
@@ -72,16 +72,33 @@ export class GateClient {
           contract,
         });
         return result.body[0];
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
-        if (i < retries) {
-          logger.warn(`获取 ${contract} 价格失败，重试 ${i + 1}/${retries}...`);
-          await new Promise(resolve => setTimeout(resolve, 300 * (i + 1))); // 递增延迟
+        
+        // 区分网络错误和其他错误
+        const isNetworkError = error.code === 'ECONNRESET' || 
+                              error.message?.includes('ECONNRESET') ||
+                              error.message?.includes('timeout') ||
+                              error.message?.includes('Network Error');
+        
+        if (isNetworkError && i < retries) {
+          const delay = 1000 * Math.pow(2, i); // 指数退避：1s, 2s, 4s, 8s
+          logger.warn(`网络错误 - 获取 ${contract} 价格失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries && error.response?.status >= 500) {
+          // 服务器错误也有重试
+          const delay = 2000 * (i + 1);
+          logger.warn(`服务器错误 - 获取 ${contract} 价格失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries) {
+          // 其他错误也尝试重试
+          logger.warn(`获取 ${contract} 价格失败，重试 ${i + 1}/${retries + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
         }
       }
     }
     
-    logger.error(`获取 ${contract} 价格失败（${retries}次重试）:`, lastError);
+    logger.error(`获取 ${contract} 价格失败（${retries + 1}次重试）:`, lastError);
     throw lastError;
   }
 
@@ -123,23 +140,38 @@ export class GateClient {
   /**
    * 获取账户余额（带重试机制）
    */
-  async getFuturesAccount(retries: number = 2) {
+  async getFuturesAccount(retries: number = 3) {
     let lastError: any;
     
     for (let i = 0; i <= retries; i++) {
       try {
         const result = await this.futuresApi.listFuturesAccounts(this.settle);
         return result.body;
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
-        if (i < retries) {
-          logger.warn(`获取账户余额失败，重试 ${i + 1}/${retries}...`);
-          await new Promise(resolve => setTimeout(resolve, 300 * (i + 1))); // 递增延迟
+        
+        // 区分网络错误和其他错误
+        const isNetworkError = error.code === 'ECONNRESET' || 
+                              error.message?.includes('ECONNRESET') ||
+                              error.message?.includes('timeout') ||
+                              error.message?.includes('Network Error');
+        
+        if (isNetworkError && i < retries) {
+          const delay = 1000 * Math.pow(2, i); // 指数退避
+          logger.warn(`网络错误 - 获取账户余额失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries && error.response?.status >= 500) {
+          const delay = 2000 * (i + 1);
+          logger.warn(`服务器错误 - 获取账户余额失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries) {
+          logger.warn(`获取账户余额失败，重试 ${i + 1}/${retries + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
         }
       }
     }
     
-    logger.error(`获取账户余额失败（${retries}次重试）:`, lastError);
+    logger.error(`获取账户余额失败（${retries + 1}次重试）:`, lastError);
     throw lastError;
   }
 
@@ -147,7 +179,7 @@ export class GateClient {
    * 获取当前持仓（带重试机制，只返回允许的币种）
    * 注意：需要指定 position mode 参数
    */
-  async getPositions(retries: number = 2) {
+  async getPositions(retries: number = 3) {
     let lastError: any;
     
     for (let i = 0; i <= retries; i++) {
@@ -166,16 +198,31 @@ export class GateClient {
         }) || [];
         
         return filteredPositions;
-      } catch (error) {
+      } catch (error: any) {
         lastError = error;
-        if (i < retries) {
-          logger.warn(`获取持仓失败，重试 ${i + 1}/${retries}...`);
-          await new Promise(resolve => setTimeout(resolve, 300 * (i + 1))); // 递增延迟
+        
+        // 区分网络错误和其他错误
+        const isNetworkError = error.code === 'ECONNRESET' || 
+                              error.message?.includes('ECONNRESET') ||
+                              error.message?.includes('timeout') ||
+                              error.message?.includes('Network Error');
+        
+        if (isNetworkError && i < retries) {
+          const delay = 1000 * Math.pow(2, i); // 指数退避
+          logger.warn(`网络错误 - 获取持仓失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries && error.response?.status >= 500) {
+          const delay = 2000 * (i + 1);
+          logger.warn(`服务器错误 - 获取持仓失败，重试 ${i + 1}/${retries + 1}，延迟 ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else if (i < retries) {
+          logger.warn(`获取持仓失败，重试 ${i + 1}/${retries + 1}...`);
+          await new Promise(resolve => setTimeout(resolve, 500 * (i + 1)));
         }
       }
     }
     
-    logger.error(`获取持仓失败（${retries}次重试）:`, lastError);
+    logger.error(`获取持仓失败（${retries + 1}次重试）:`, lastError);
     throw lastError;
   }
 
