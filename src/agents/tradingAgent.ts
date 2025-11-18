@@ -666,13 +666,23 @@ function generateVisualPatternPromptForCycle(data: any): string {
        const decisionText: string = lastDecision.decision_text || "无决策内容";
 
 
+       // 提取从"总体结论"开始到文本结束的所有内容，不做任何截断
+        let keyDecisionInfo = decisionText;
+        
+        // 尝试提取从"总体结论"开始到文本结束的所有内容
+        const conclusionMatch = decisionText.match(/## 总体结论[\s\S]*$/);
+        if (conclusionMatch) {
+            keyDecisionInfo = conclusionMatch[0];
+        }
+        
+        // 直接使用提取的完整内容，不做任何截断
+        const displayText = keyDecisionInfo;
+       
        prompt += `## 四、最近一次决策摘要
 
 
 上次决策时间: ${formatChinaTime(new Date(lastDecision.created_at))}
-上次决策内容（截断预览）: ${decisionText.substring(0, 200)}${
-           decisionText.length > 200 ? "..." : ""
-       }
+上次关键决策信息: ${displayText}
 
 
 请参考上一轮的决策，避免在短时间内频繁反向操作，除非你通过 patternAnalysisTool 和其他工具确认资金结构已经发生明显逆转。
