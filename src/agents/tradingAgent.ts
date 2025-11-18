@@ -663,7 +663,7 @@ function generateVisualPatternPromptForCycle(data: any): string {
    // 最近一次决策信息
    if (recentDecisions && recentDecisions.length > 0) {
        const lastDecision = recentDecisions[0];
-       const decisionText: string = lastDecision.decision_text || "无决策内容";
+       const decisionText: string = lastDecision.decision || "无决策内容";
 
 
        // 提取从"总体结论"开始到文本结束的所有内容，不做任何截断
@@ -681,7 +681,7 @@ function generateVisualPatternPromptForCycle(data: any): string {
        prompt += `## 四、最近一次决策摘要
 
 
-上次决策时间: ${formatChinaTime(new Date(lastDecision.created_at))}
+上次决策时间: ${formatChinaTime(new Date(lastDecision.timestamp))}
 上次关键决策信息: ${displayText}
 
 
