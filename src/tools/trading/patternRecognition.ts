@@ -1046,8 +1046,11 @@ OI 和 CVD 同时反向的节点等。
 
 
        const content = response.choices[0]?.message?.content?.trim();
+       
+       // 记录模式识别分析结果
+       logger.info(`模式识别分析结果 (${symbol} ${timeframe}): ${content?.substring(0, 200)}...`); // 只记录前200个字符
        if (!content) {
-           throw new Error("AI模型未能识别出有效形态，请勿参考此分析结果。");
+          throw new Error(`视觉模型未能识别出${symbol} ${timeframe}的有效形态，请勿参考此分析结果。`);
        }
        return content;
 
