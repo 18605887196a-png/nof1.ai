@@ -23,7 +23,7 @@ module.exports = {
   apps: [
     {
       name: "open-nof1.ai-multi",
-      script: "./dist/index.js",
+      script: "./dist/index.mjs",
       instances: 1,
       exec_mode: "fork",
       watch: false,

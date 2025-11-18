@@ -59,7 +59,7 @@ const SYMBOL_MAP: Record<string, string> = {
 export async function captureCoingleassChart(
  symbol: string = 'BTC',
  timeframe?: '1m' | '5m' | '30m',
- exchange: string = 'Binance'
+ exchange: string = 'Bybit'
 ): Promise<string> {
  let browser: Browser | undefined;
  const timings: Record<string, number> = {};
@@ -92,7 +92,7 @@ export async function captureCoingleassChart(
   
    // 构建URL
    const symbolPair = SYMBOL_MAP[symbol.toUpperCase()] || `${symbol.toUpperCase()}USDT`;
-   const url = `https://www.coinglass.com/tv/zh/${exchange}_${symbolPair}`;
+   const url = `https://www.coinglass.com/tv/${exchange}_${symbolPair}`;
   
    logger.info(`访问页面: ${url}`);
   
