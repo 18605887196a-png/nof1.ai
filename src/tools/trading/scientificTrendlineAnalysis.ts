@@ -806,8 +806,30 @@ export const scientificTrendlineAnalysisTool = createTool({
 
            logger.info(`找到${supportLines.length}条支撑线，${resistanceLines.length}条阻力线`);
 
+           // 计算具体支撑位和阻力位价格
+           const keyLevels = {
+               support: supportLines.map(line => {
+                   const price = line.slope * (prices.length - 1) + line.intercept;
+                   return parseFloat(price.toFixed(2));
+               }),
+               resistance: resistanceLines.map(line => {
+                   const price = line.slope * (prices.length - 1) + line.intercept;
+                   return parseFloat(price.toFixed(2));
+               }),
+           };
 
-
+           // 输出具体的支撑位和阻力位价格
+           if (keyLevels.support.length > 0) {
+               logger.info(`支撑位价格: ${keyLevels.support.join(', ')}`);
+           } else {
+               logger.info('无支撑位');
+           }
+           
+           if (keyLevels.resistance.length > 0) {
+               logger.info(`阻力位价格: ${keyLevels.resistance.join(', ')}`);
+           } else {
+               logger.info('无阻力位');
+           }
 
            // 科学识别价格通道
            const channel = identifyPriceChannel(supportLines, resistanceLines, currentPrice, prices);
