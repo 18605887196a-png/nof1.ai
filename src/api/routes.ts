@@ -202,14 +202,20 @@ export function createApiRoutes() {
         args = [symbol, limit];
       }
       
-      logger.info(`查询交易记录: limit=${limit}, symbol=${symbol || 'all'}`);
+      // 减少日志冗余，只记录重要查询的日志
+      if (limit > 10 || symbol) {
+        logger.info(`查询交易记录: limit=${limit}, symbol=${symbol || 'all'}`);
+      }
       
       const result = await dbClient.execute({
         sql,
         args,
       });
       
-      logger.info(`查询到 ${result.rows.length} 条交易记录`);
+      // 只在有数据时才记录，减少重复日志
+      if (result.rows && result.rows.length > 0) {
+        logger.debug(`查询到 ${result.rows.length} 条交易记录`);
+      }
       
       if (!result.rows || result.rows.length === 0) {
         return c.json({ trades: [] });

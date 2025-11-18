@@ -107,8 +107,9 @@ export async function recordAccountAssets(skipLog: boolean = false) {
  * 启动账户资产记录器
  */
 export function startAccountRecorder() {
+  // 为老旧电脑优化：延长记录间隔，减少资源消耗
   const intervalMinutes = Number.parseInt(
-    process.env.ACCOUNT_RECORD_INTERVAL_MINUTES || "10"
+    process.env.ACCOUNT_RECORD_INTERVAL_MINUTES || "30"  // 从10分钟增加到30分钟
   );
   
   logger.info(`Starting account recorder, interval: ${intervalMinutes} minutes`);
