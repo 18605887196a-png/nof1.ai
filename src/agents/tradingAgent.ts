@@ -819,23 +819,49 @@ export function generateTradingPrompt(data: {
        }
 
 
-       // 最近一次决策信息 —— 完整保留，绝不截断！
+       // 最近一次决策信息 - 只保留关键结论，精简冗余内容
        if (recentDecisions && recentDecisions.length > 0) {
            const lastDecision = recentDecisions[0];
            const decisionText: string = lastDecision.decision || "";
 
-
            let displayText = "无决策内容";
 
+           // 优化决策信息过滤：优先提取"得出以下综合判断"后面的所有内容
+           // 这是最核心的决策部分，包含了所有关键结论
+           const comprehensiveConclusionMatch = decisionText.match(/得出以下综合判断[\s\S]*$/i);
+           if (comprehensiveConclusionMatch) {
+               // 提取匹配内容并去掉开头的"得出以下综合判断"文本
+               displayText = comprehensiveConclusionMatch[0].replace(/^得出以下综合判断/i, '').trim();
+           }
+           // 如果没有找到综合判断，回退到之前的模式匹配
+           else {
+               const keyPatterns = [
+                   // 新增：提取"关键结论的简要复述"部分
+                   /(?:^|\n)(?:关键结论|关键结论的简要复述)[\s\S]*?(?=\n\s*---|\n\s*##|$)/i,
+                   // 1. 提取建议部分
+                   /(?:^|\n)(?:我当前建议|我的建议|当前建议).*?\n(?:\n.*?核心理由[\s\S]*?)(?=\n\s*---|\n\s*##|$)/is,
+                   // 2. 提取主要结论部分
+                   /(?:^|\n)(?:总体结论|Overall Conclusion|综合结论|核心结论|结论)[\s\S]*?(?=\n\s*---|\n\s*##|$)/i,
+                   // 3. 提取以"基于"开头的总结性句子
+                   /(?:^|\n)基于[\s\S]*?$/i
+               ];
 
-           // 尝试提取从"总体结论"开始到结尾的完整内容（不区分大小写，支持多种写法）
-           const match = decisionText.match(/(?:^|\n)(总体结论|Overall Conclusion)[\s\S]*$/i);
-           if (match) {
-               // 提取匹配到的部分，并去除开头可能的换行或空白
-               displayText = match[0].replace(/^[^\S\n]*\n?/, "").trim();
-           } else if (decisionText.trim()) {
-               // 如果没有"总体结论"，则使用完整原始文本（绝不截断！）
-               displayText = decisionText.trim();
+               // 尝试匹配关键模式
+               let foundKeyContent = false;
+               for (const pattern of keyPatterns) {
+                   const match = decisionText.match(pattern);
+                   if (match) {
+                       displayText = match[0].replace(/^[^\S\n]*\n?/, "").trim();
+                       foundKeyContent = true;
+                       break;
+                   }
+               }
+
+               // 如果所有模式都没找到，保留最后5行作为精简内容
+               if (!foundKeyContent && decisionText.trim()) {
+                   const lines = decisionText.trim().split('\n');
+                   displayText = lines.slice(-5).join('\n');
+               }
            }
 
 

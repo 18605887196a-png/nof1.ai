@@ -40,10 +40,9 @@ module.exports = {
       out_file: "./logs/pm2-out.log",
       log_date_format: "YYYY-MM-DD HH:mm:ss Z",
       merge_logs: true,
-      // 为老旧电脑优化日志轮转配置
-      log_rotate_interval: "6h",           // 更频繁轮转，每6小时轮转一次
-      log_rotate_keep: 2,                  // 保留更少文件，节省磁盘空间
-      log_rotate_max_size: "2M",           // 更小的单文件大小限制
+      log_rotate_interval: "3h", 
+      log_rotate_keep: 1, 
+      log_rotate_max_size: "1M",
       // 优雅退出设置
       kill_timeout: 5000,
       listen_timeout: 3000,
