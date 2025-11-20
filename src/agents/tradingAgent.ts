@@ -966,7 +966,6 @@ export function generateTradingPrompt(data: {
    function generateVisualPatternPromptForCycle(data: any): string {
        const strategy = 'swing'; // 👈 可随时改为 'trend'
 
-
        const {
            minutesElapsed,
            iteration,
@@ -977,7 +976,6 @@ export function generateTradingPrompt(data: {
            tradeHistory,
            recentDecisions,
        } = data;
-
 
        // 🔥 关键修正：主周期 = 大周期（定方向），辅周期 = 小周期（找入场点）
        let primaryTimeframe, secondaryTimeframe, strategyTitle;
@@ -997,19 +995,14 @@ export function generateTradingPrompt(data: {
 
        let prompt = `# ${strategyTitle} 周期 #${iteration} | ${currentTime} | 决策周期: ${intervalMinutes} 分钟
 
-
 你当前采用 **${strategy === 'swing' ? '日内波段交易' : '中长线趋势跟踪'}** 策略，请严格遵循系统指令中的对应行为原则。 
 **请严格遵循系统指令中的要求**：优先调用 \`patternAnalysisTool\` 获取 Coinglass 视觉分析结论，再结合其他工具进行验证和执行，**禁止凭空假设市场数据**。
 
-
 本轮提示仅为你提供“人类侧”的上下文信息：关注标的列表、账户状态、当前持仓和上一轮决策，帮助你在工具分析的基础上做出更合理的交易决策。
-
 
 ## 一、本轮关注的交易对列表
 
-
 本轮默认关注以下交易对（如果需要，可在分析时重点筛选 1–3 个作为执行重点）：`;
-
 
        // 只列出 symbol 和一个参考价，不展开指标细节
        for (const [symbol, dataRaw] of Object.entries(marketData)) {
