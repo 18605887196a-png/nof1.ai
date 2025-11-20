@@ -146,8 +146,24 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 已运行: ${minutesElapsed} 分钟
 执行周期: 每 ${intervalMinutes} 分钟
+
+
+
+
+
+
+
+
 
 
 
@@ -159,6 +175,14 @@ function generateAiAutonomousPromptForCycle(data: {
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【系统硬性风控底线】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
 
 
 
@@ -180,9 +204,25 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【当前账户状态】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
 
 
 
@@ -195,6 +235,14 @@ function generateAiAutonomousPromptForCycle(data: {
 可用余额: ${(accountInfo?.availableBalance ?? 0).toFixed(2)} USDT
 未实现盈亏: ${(accountInfo?.unrealisedPnl ?? 0) >= 0 ? '+' : ''}${(accountInfo?.unrealisedPnl ?? 0).toFixed(2)} USDT
 持仓数量: ${positions?.length ?? 0} 个
+
+
+
+
+
+
+
+
 
 
 
@@ -221,10 +269,20 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 `;
        for (const pos of positions) {
            const holdingMinutes = Math.floor((new Date().getTime() - new Date(pos.opened_at).getTime()) / (1000 * 60));
            const holdingHours = (holdingMinutes / 60).toFixed(1);
+
+
 
 
            // 计算盈亏百分比
@@ -232,6 +290,8 @@ function generateAiAutonomousPromptForCycle(data: {
            const currentPrice = pos.current_price ?? 0;
            const unrealizedPnl = pos.unrealized_pnl ?? 0;
            let pnlPercent = 0;
+
+
 
 
            if (entryPrice > 0 && currentPrice > 0) {
@@ -243,7 +303,11 @@ function generateAiAutonomousPromptForCycle(data: {
            }
 
 
+
+
            prompt += `${pos.contract} ${pos.side === 'long' ? '做多' : '做空'}:\n`;
+
+
 
 
            prompt += `  持仓量: ${pos.quantity ?? 0} 张\n`;
@@ -265,7 +329,23 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 无持仓
+
+
+
+
+
+
+
+
 
 
 
@@ -292,7 +372,23 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 注意：所有价格和指标数据按时间顺序排列（最旧 → 最新）
+
+
+
+
+
+
+
+
 
 
 
@@ -312,6 +408,8 @@ function generateAiAutonomousPromptForCycle(data: {
            const data = dataRaw as any;
 
 
+
+
            prompt += `\n【${symbol}】\n`;
            prompt += `当前价格: ${(data?.price ?? 0).toFixed(1)}\n`;
            prompt += `EMA20: ${(data?.ema20 ?? 0).toFixed(3)}\n`;
@@ -319,12 +417,18 @@ function generateAiAutonomousPromptForCycle(data: {
            prompt += `RSI(7): ${(data?.rsi7 ?? 0).toFixed(3)}\n`;
 
 
+
+
            if (data?.fundingRate !== undefined) {
                prompt += `资金费率: ${data.fundingRate.toExponential(2)}\n`;
            }
 
 
+
+
            prompt += `\n`;
+
+
 
 
            // 输出多时间框架数据
@@ -358,6 +462,14 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 `;
        let profitCount = 0;
        let lossCount = 0;
@@ -371,6 +483,8 @@ function generateAiAutonomousPromptForCycle(data: {
            const pnl = trade?.pnl ?? 0;
 
 
+
+
            // 计算收益率（如果有pnl和价格信息）
            let pnlPercent = 0;
            if (pnl !== 0 && trade.price && trade.quantity && trade.leverage) {
@@ -381,6 +495,8 @@ function generateAiAutonomousPromptForCycle(data: {
            }
 
 
+
+
            prompt += `${trade.symbol}_USDT ${trade.side === 'long' ? '做多' : '做空'}:\n`;
            prompt += `  时间: ${tradeTime}\n`;
            prompt += `  盈亏: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} USDT\n`;
@@ -388,6 +504,8 @@ function generateAiAutonomousPromptForCycle(data: {
                prompt += `  收益率: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}%\n`;
            }
            prompt += `\n`;
+
+
 
 
            if (pnl > 0) {
@@ -428,11 +546,21 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 `;
        for (let i = 0; i < Math.min(5, recentDecisions.length); i++) {
            const decision = recentDecisions[i];
            const decisionTime = formatChinaTime(decision.timestamp);
            const timeDiff = Math.floor((new Date().getTime() - new Date(decision.timestamp).getTime()) / (1000 * 60));
+
+
 
 
            prompt += `周期 #${decision.iteration} (${decisionTime}，${timeDiff}分钟前):\n`;
@@ -462,7 +590,23 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 在做出交易决策之前，请先进行自我复盘：
+
+
+
+
+
+
+
+
 
 
 
@@ -483,10 +627,26 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 2. **评估当前策略有效性**：
 - 当前使用的交易策略是否适应市场环境？
 - 杠杆和仓位管理是否合理？
 - 是否存在重复犯错的模式？
+
+
+
+
+
+
+
+
 
 
 
@@ -507,6 +667,14 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 4. **制定改进计划**：
 - 基于复盘结果，本次交易应该如何调整策略？
 - 需要避免哪些之前犯过的错误？
@@ -519,8 +687,24 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 **复盘输出格式**：
 在做出交易决策前，请先输出你的复盘思考（用文字描述），然后再执行交易操作。
+
+
+
+
+
+
+
+
 
 
 
@@ -545,9 +729,25 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 【本次交易决策】
 （然后再执行具体的交易操作）
 \`\`\`
+
+
+
+
+
+
+
+
 
 
 
@@ -572,9 +772,25 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 • openPosition: 开仓（做多或做空）
 - 参数: symbol（币种）, side（long/short）, leverage（杠杆）, amountUsdt（金额）
 - 手续费: 约 0.05%
+
+
+
+
+
+
+
+
 
 
 
@@ -594,9 +810,25 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【开始交易】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
 
 
 
@@ -619,6 +851,14 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 记住：
 - 没有任何策略建议和限制（除了系统硬性风控底线）
 - 完全由你自主决定交易策略
@@ -632,7 +872,23 @@ function generateAiAutonomousPromptForCycle(data: {
 
 
 
+
+
+
+
+
+
+
+
 现在请做出你的决策并执行。
+
+
+
+
+
+
+
+
 
 
 
@@ -706,8 +962,11 @@ export function generateTradingPrompt(data: {
 
 
 
-// 视觉模式策略专用提示词生成函数 - 作为 Agent 指令的补充
+   // 视觉模式策略专用提示词生成函数 - 作为 Agent 指令的补充
    function generateVisualPatternPromptForCycle(data: any): string {
+       const strategy = 'swing'; // 👈 可随时改为 'trend'
+
+
        const {
            minutesElapsed,
            iteration,
@@ -720,13 +979,26 @@ export function generateTradingPrompt(data: {
        } = data;
 
 
+       // 🔥 关键修正：主周期 = 大周期（定方向），辅周期 = 小周期（找入场点）
+       let primaryTimeframe, secondaryTimeframe, strategyTitle;
+       if (strategy === 'swing') {
+           primaryTimeframe = '1h';      // 主趋势周期（定方向）
+           secondaryTimeframe = '15m';   // 入场时机周期（找逆势点）
+           strategyTitle = '日内波段交易';
+       } else {
+           primaryTimeframe = '4h';      // 主趋势周期（定方向）
+           secondaryTimeframe = '1h';    // 入场时机周期（找逆势点）
+           strategyTitle = '中长线趋势跟踪';
+       }
+
+
        const currentTime = formatChinaTime();
 
 
-       let prompt = `# 视觉模式识别交易周期 #${iteration} | ${currentTime} | 周期: ${intervalMinutes} 分钟
+       let prompt = `# ${strategyTitle} 周期 #${iteration} | ${currentTime} | 决策周期: ${intervalMinutes} 分钟
 
 
-你当前的角色和详细工作流程，已经在系统指令（Agent 的 instructions）中定义完备，这里不再重复。 
+你当前采用 **${strategy === 'swing' ? '日内波段交易' : '中长线趋势跟踪'}** 策略，请严格遵循系统指令中的对应行为原则。 
 **请严格遵循系统指令中的要求**：优先调用 \`patternAnalysisTool\` 获取 Coinglass 视觉分析结论，再结合其他工具进行验证和执行，**禁止凭空假设市场数据**。
 
 
@@ -759,23 +1031,18 @@ export function generateTradingPrompt(data: {
 ## 二、账户整体状态
 
 
-- 总资产: ${accountInfo.totalBalance.toFixed(2)} USDT 
-- 可用余额: ${accountInfo.availableBalance.toFixed(1)} USDT 
+- 总资产: ${accountInfo.totalBalance.toFixed(2)} USDT
+- 可用余额: ${accountInfo.availableBalance.toFixed(1)} USDT
 - 账户累计收益率: ${accountInfo.returnPercent.toFixed(2)}%
 
 
 这部分信息用于帮助你控制整体风险敞口和单笔仓位大小。具体仓位和风险计算，请在需要时调用 \`calculateRiskTool\`.
-
-
 `;
 
 
        // 当前持仓信息
        if (positions && positions.length > 0) {
-           prompt += `## 三、当前持仓（本轮优先管理对象）
-
-
-`;
+           prompt += `## 三、当前持仓（本轮优先管理对象）\n\n`;
 
 
            for (const pos of positions) {
@@ -794,28 +1061,56 @@ export function generateTradingPrompt(data: {
                }
 
 
-               prompt += `- ${pos.symbol} ${side} ${leverage}x | 参考浮动盈亏约: ${
+               // === 新增：峰值与回撤数据（仅客观展示）===
+               const peakPnlPercent = pos.peak_pnl_percent || 0;
+               const drawdownFromPeak = peakPnlPercent > 0 ? peakPnlPercent - pnlPercent : 0;
+               // ✅ 新增：智能判断“有意义的由盈转亏”（考虑杠杆）
+               const baseThreshold = params.baseThreshold; // 无杠杆基准阈值
+               const effectiveLeverage = Math.min(leverage, 5); // 防止超高杠杆
+               const profitThreshold = (baseThreshold || 2) * effectiveLeverage; // 杠杆调整后阈值
+
+
+               const meaningfulProfit = peakPnlPercent >= profitThreshold;
+               const isNowLosing = pnlPercent < 0;
+               const priceBrokeEntry =
+                   (pos.side === 'short' && pos.current_price > entry) ||
+                   (pos.side === 'long' && pos.current_price < entry);
+               const isSignificantProfitToLoss = meaningfulProfit && isNowLosing && priceBrokeEntry;
+
+
+               let riskFlag = "";
+               if (drawdownFromPeak >= params.peakDrawdownProtection) {
+                   riskFlag = "⚠️ 超限回撤";
+               } else if (drawdownFromPeak >= params.peakDrawdownProtection * 0.7) {
+                   riskFlag = "⚠️ 接近回撤阈值";
+               }
+               // ✅ 新增：由盈转亏标记（仅当满足条件）
+               if (isSignificantProfitToLoss) {
+                   riskFlag += " ⚠️ 由盈转亏";
+               }
+
+
+               prompt += `- ${pos.symbol} ${side} ${leverage}x | 浮动盈亏: ${
                    pnlPercent >= 0 ? "+" : ""
-               }${pnlPercent.toFixed(2)}%\n`;
+               }${pnlPercent.toFixed(2)}%`;
+
+
+               if (peakPnlPercent > 0) {
+                   prompt += ` | 历史峰值盈亏: +${peakPnlPercent.toFixed(2)}% | 自峰值回撤: ${drawdownFromPeak.toFixed(2)}%`;
+               }
+               if (riskFlag) {
+                   prompt += ` ${riskFlag}`;
+               }
+               prompt += "\n";
            }
 
 
-           prompt += `
-请在本轮决策中，优先评估上述持仓是否需要：
+           prompt += `\n请在本轮决策中，优先评估上述持仓是否需要：
 - 继续持有（并调整止损/止盈）；
 - 分批止盈或部分减仓；
-- 直接平仓离场.
-
-
-`;
+- 直接平仓离场。\n`;
        } else {
-           prompt += `## 三、当前持仓
-
-
-当前无持仓，本轮可以更侧重新机会的筛选和布局，但仍需**严格控制风险与仓位**，避免一次性大额建仓.
-
-
-`;
+           prompt += `## 三、当前持仓\n\n当前无持仓，本轮可以更侧重新机会的筛选和布局，但仍需**严格控制风险与仓位**，避免一次性大额建仓.\n`;
        }
 
 
@@ -824,7 +1119,9 @@ export function generateTradingPrompt(data: {
            const lastDecision = recentDecisions[0];
            const decisionText: string = lastDecision.decision || "";
 
+
            let displayText = "无决策内容";
+
 
            // 优化决策信息过滤：优先提取"得出以下综合判断"后面的所有内容
            // 这是最核心的决策部分，包含了所有关键结论
@@ -846,6 +1143,7 @@ export function generateTradingPrompt(data: {
                    /(?:^|\n)基于[\s\S]*?$/i
                ];
 
+
                // 尝试匹配关键模式
                let foundKeyContent = false;
                for (const pattern of keyPatterns) {
@@ -856,6 +1154,7 @@ export function generateTradingPrompt(data: {
                        break;
                    }
                }
+
 
                // 如果所有模式都没找到，保留最后5行作为精简内容
                if (!foundKeyContent && decisionText.trim()) {
@@ -873,13 +1172,11 @@ export function generateTradingPrompt(data: {
 
 
 - 上次决策时间: ${formatChinaTime(new Date(lastDecision.timestamp))}
-- 上次关键决策信息: 
+- 上次关键决策信息:
 ${indentedText}
 
 
 > 🔄 请参考上一轮的决策，**避免在短时间内频繁反向操作**，除非你通过 \`patternAnalysisTool\` 和其他工具确认资金结构已经发生明显逆转.
-
-
 `;
        }
 
@@ -887,36 +1184,80 @@ ${indentedText}
        prompt += `## 五、本轮执行重点与要求
 
 
-请牢记，详细的形态与资金结构分析，应通过工具完成：
+请牢记，详细的形态与资金结构分析必须通过工具完成：
 
 
 - **Coinglass 图表及综合资金结构**：调用 \`patternAnalysisTool\`。 
- 对同一个交易对，你可以在不同时间周期上多次调用 \`patternAnalysisTool\`，用于进行“多周期共振分析”，比较短周期与中/长周期的趋势与资金结构是否共振或矛盾。
+ 对同一交易对，需在 **主趋势周期（${primaryTimeframe}）** 和 **入场时机周期（${secondaryTimeframe}）** 分别调用，进行多周期分析。
 - **实时价格与技术指标**：调用 \`getMarketPriceTool\`、\`getTechnicalIndicatorsTool\`。
 - **资金费率与情绪**：调用 \`getFundingRateTool\`。
 - **趋势线与结构验证**：调用 \`scientificTrendlineAnalysisTool\`。
 - **订单簿与流动性**：调用 \`analyzeOrderBookDepthTool\`。
 - **账户与风险**：调用 \`getAccountBalanceTool\`、\`getPositionsTool\`、\`calculateRiskTool\`。
-- **执行交易**：调用 \`openPositionTool\`、\`closePositionTool\`、\`cancelOrderTool\`。
+- **执行交易**：调用 \`openPositionTool\`、\`closePositionTool\`、\`cancelOrderTool\`.
 
 
-当你基于 \`patternAnalysisTool\` 与上述验证工具，识别到 **A 级信号**（评分 ≥7 或明显强信号）且风险收益比合理时，应按照系统指令中的流程：**先验证 → 再计算仓位 → 最后使用 \`openPositionTool\` 执行**，而不是只做文字分析。
+### 关于“峰值回撤保护”的强制要求
 
 
-在分析过程中，特别是当：
-- 某个交易对出现较强信号，或 
-- 同一周期内部结构/资金信号存在明显矛盾时， 
+- **峰值回撤** = 历史最高浮盈% - 当前浮盈/浮亏%。
+- **当某持仓自峰值回撤 ≥ ${params.peakDrawdownProtection}%**：
+ - **必须执行“保护盈利”操作**（分批止盈或直接平仓）；
+ - **仅当同时满足以下条件时，才可例外继续持有**：
+   1. 通过 \`patternAnalysisTool\` 确认**主趋势周期（${primaryTimeframe}）** 结构仍**强烈且明确**支持原方向；
+   2. 资金流向（CVD/OI）**持续同向共振**，无衰竭迹象；
+   3. **必须明确写出新的、更紧的止损/止盈价位**。
+- **当回撤 ≥ ${(params.peakDrawdownProtection * 0.7).toFixed(1)}%**（接近阈值）：
+ - **必须在本轮主动评估减仓**，不得以“趋势未反转”为由被动持有.
 
 
-你应优先考虑进行“**多周期共振分析**”：
+### 关于“由盈转亏”的智能处理规范
 
 
-1. 先在一个**短周期**（如 5m 或 15m）上调用 \`patternAnalysisTool\`，获取短线结构与资金行为；
-2. 再在一个**中/长周期**（如 30m、1h 或 4h）上调用 \`patternAnalysisTool\`，获取更大级别结构与资金行为；
-3. 在最终判断中，明确说明短周期与中/长周期之间的关系：
-  - 若多个周期方向和结构**基本共振**（例如短周期与中周期都偏多或都偏空），可视为“多周期共振”，适度提高该信号的可信度和执行意愿；
-  - 若短周期与中/长周期**方向矛盾**（例如短周期偏多反弹，但更大周期仍是下跌中继），通常应将短周期信号视为“反弹/回调中的机会”，降低信号等级或优先考虑观望/轻仓；
-  - 若中/长周期趋势**非常明确**，而短周期只是逆势的小级别波动，你应**优先尊重大周期方向**，对逆大趋势的短周期信号保持高度谨慎。
+当持仓出现 **“有意义的由盈转亏”**（历史盈利 ≥ ${params.baseThreshold}%×杠杆、当前浮亏、价格反向突破入场价）时：
+- **必须调用 \`patternAnalysisTool\` 分析当前结构**，禁止凭记忆或偏见决策；
+- **默认建议平仓**，除非同时满足：
+ 1. **主趋势周期（如${primaryTimeframe}）** 仍**强烈支持原方向**；
+ 2. 当前仅为**缩量回调/洗盘**，无新资金反向入场（CVD/OI 未转势）；
+ 3. **明确写出新的、更紧的止损价位**（例如：空单止损设于91,600）。
+- **若无法确认是洗盘，必须平仓**，避免“回本再卖”的情绪化操作.
+
+
+${
+           strategy === 'swing'
+               ? `### 波段策略行为原则
+- **以主趋势周期（1h）定方向**，入场周期（15m）用于寻找逆势反弹/回调点；
+- **盈利保护优先于趋势跟踪**，达到策略设定阈值必须评估止盈；
+- **对资金结构变化高度敏感**，费率、CVD、OI 的快速转向需立即响应；
+- **持仓周期通常不超过24小时**，隔夜持仓需有明确理由；
+- **由盈转亏状态必须严肃评估**，不得无条件死扛。`
+               : `### 趋势策略行为原则
+- **以主趋势周期（4h）定方向**，入场周期（1h）仅用于寻找逆势回调入场点；
+- **不得因入场周期的短期反弹/回调而违背主趋势方向**；
+- **止损设置应充分容纳正常波动**，避免被短期噪音触发；
+- **移动止盈是核心风控手段**，大幅盈利后必须动态保护；
+- **持仓周期以天为单位**，避免因日内波动过早离场。`
+       }
+
+
+> ⚠️ 识别到 A 级信号（评分 ≥7）且风险收益比合理时，应按流程：**先验证 → 再计算仓位 → 最后调用 \`openPositionTool\` 执行**，而非仅文字分析.
+
+
+### 多周期共振分析规范
+
+
+根据“顺大逆小”原则：
+
+
+- **主趋势周期（${primaryTimeframe}）**：确定主要交易方向；
+- **入场时机周期（${secondaryTimeframe}）**：寻找与主趋势相反的短期波动作为入场点。
+
+
+**重要原则**：
+- **必须优先服从主趋势周期的方向**；
+- 入场时机周期出现**与主趋势相反的短期波动时**，才是理想的入场机会；
+- **不得因入场周期的短期信号而违背主趋势方向**；
+- 若入场周期显示极端风险信号（如爆仓潮、资金费率极端），即使与主趋势同向也需谨慎评估.
 
 
 ---
@@ -925,33 +1266,41 @@ ${indentedText}
 ## 六、本轮回复中需要给出的内容
 
 
-在本轮回复中，请完成以下四点（可以清晰分段）：
+请清晰分段完成以下四点：
 
 
 ### 1）总体结论
-- 明确写出本轮你的总体建议：【做多 / 做空 / 观望】（只能选一个为主），以及主要针对的交易对；
-- 如你在本轮分析中使用了多周期信息（例如同一交易对的 5m + 30m 或 15m + 1h 分析），请简要说明你的“多周期共振分析”结论（例如：“短周期反弹但中周期仍为下跌中继，二者不共振，因此仅考虑反弹做空机会，不追多”）。
+- 明确写出本轮总体建议：【做多 / 做空 / 观望】（仅选一个为主），及主要交易对；
+- 若使用多周期分析，请简要说明结论（如：“1h趋势看空，15m反弹提供做空机会”）。
 
 
 ### 2）持仓管理建议
-- 对每个当前持仓，说明你建议：**继续持有 / 调整止损止盈 / 分批减仓 / 全部平仓**；
-- 并给出 1–2 条最关键理由（至少包含一条与**资金结构**或**走势结构**相关）。
+- 对每个持仓，明确建议：**继续持有 / 调整止损止盈 / 分批减仓 / 全部平仓**；
+- **必须包含以下两类理由**：
+ - **市场结构理由**：基于 \`patternAnalysisTool\` 等工具的 CVD、OI、趋势结构；
+ - **风控理由**：若该持仓满足任一条件，必须说明处理方案：
+   - 自峰值回撤 ≥ ${(params.peakDrawdownProtection * 0.7).toFixed(1)}%；
+   - **出现“有意义的由盈转亏”**（历史峰值盈亏显著（通常 ≥ 杠杆倍数 × 2%）、当前浮亏、且价格已反向突破入场价）。
 
 
 ### 3）新机会评估
-- 如你认为某些交易对存在 A/B 级别的可执行机会，请指出：
- - 标的（交易对）
- - 方向（多/空）
- - 大致结构逻辑（例如：下跌后技术性反弹、下跌中继、底部构筑等）
- - 以及你是否计划在本轮**实际执行**（调用 \`openPositionTool\`）还是只列为**后续观察对象**。
+- 如存在 A/B 级机会，请指出：
+ - 标的（交易对）；
+ - 方向（多/空）；
+ - 结构逻辑（如：1h下跌中继，15m反弹做空）；
+ - 是否**本轮实际执行**（调用 \`openPositionTool\`）或仅列为观察对象。
 
 
 ### 4）风险提示
-- 指出当前市场结构中最需要警惕的 1–2 个风险点（例如：OI 高位 + 正费率极端、可能处于杀多阶段等）；
-- 明确说明：**若出现哪类变化**，你会立刻建议收缩风险或反向思考（例如：某关键位被放量突破且 OI、CVD 同向爆发等）。
+- 指出 1–2 个最需警惕的市场风险（如：OI 高位 + 正费率极端）；
+- 明确说明：**若出现哪类变化，会立即收缩风险或反向**（如：突破91,500 + CVD转正 + OI上升）；
+- **若当前持仓存在显著回撤**（≥ ${(params.peakDrawdownProtection * 0.7).toFixed(1)}%）：
+ - 必须说明其**盈利回吐风险**；
+ - **明确是否建议立刻减仓/平仓**；
+ - 如选择持有，需给出**清晰前提条件**（如：1h周期仍强空）及**具体风控方案**（如：止损设于91,200）。
 
 
-> ⚠️ **重要**：请先根据系统指令合理调用工具，再基于工具返回结果给出你的文字决策。**不要仅凭本提示中的静态数据直接下结论**.
+> ⚠️ **重要**：请先调用工具获取数据，再基于工具结果决策。**禁止仅凭本提示中的静态信息下结论**.
 `;
 
 
@@ -959,12 +1308,18 @@ ${indentedText}
    }
 
 
-
-
    // 生成专业交易原则框架
    const generateTradingPrinciples = () => {
        return `【专业交易原则】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
 
 
 
@@ -988,6 +1343,14 @@ ${indentedText}
        if (!tradeHistory || tradeHistory.length === 0) {
            return `【策略表现分析】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+
+
+
+
+
+
 
 
 
@@ -1090,12 +1453,28 @@ ${indentedText}
 
 
 
+
+
+
+
+
+
+
+
 最近10笔交易统计：
 • 胜率：${winRate.toFixed(1)}%
 • 平均盈亏比：${profitLossRatio.toFixed(2)}
 • 最大连续盈利：${maxWinStreak}笔
 • 最大连续亏损：${maxLossStreak}笔
 • 策略有效性评分：${strategyScore}/10
+
+
+
+
+
+
+
+
 
 
 
@@ -1120,8 +1499,24 @@ ${indentedText}
 
 
 
+
+
+
+
+
+
+
+
 ## 交易原则与框架
 ${generateTradingPrinciples()}
+
+
+
+
+
+
+
+
 
 
 
@@ -1134,6 +1529,14 @@ ${generateTradingPrinciples()}
 1️⃣ 持仓管理（止损/止盈/峰值回撤）
 2️⃣ 新开仓机会（多时间框架趋势+技术共振）
 3️⃣ 加仓机会（盈利>5%且趋势强化，≤50%原仓位）
+
+
+
+
+
+
+
+
 
 
 
@@ -1159,6 +1562,10 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
 
 
 
+
+
+
+
 ### 技术指标说明
 请基于以下各币种的详细技术指标数据进行综合分析：
 - 评估各币种的趋势方向（上涨/下跌/盘整）
@@ -1169,6 +1576,10 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
 - 分析波动率（ATR指标）评估风险
 - 结合成交量确认趋势强度
 - 结合多时间框架数据进行综合趋势确认
+
+
+
+
 
 
 
@@ -1236,6 +1647,8 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            let tfData = [];
 
 
+
+
            for (const tf of keyTfs) {
                const tfInfo = data.timeframes[tf];
                if (tfInfo) {
@@ -1243,6 +1656,8 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
                    tfData.push(`${tf}周期: 价格${tfInfo.currentPrice.toFixed(2)} | EMA${tfInfo.ema20.toFixed(2)} | MACD${tfInfo.macd.toFixed(3)} | RSI${tfInfo.rsi7.toFixed(0)}`);
                }
            }
+
+
 
 
            if (tfData.length > 0) {
@@ -1303,6 +1718,8 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            const pnlPercent = priceChangePercent * pos.leverage;
 
 
+
+
            // 计算持仓时长
            const openedTime = new Date(pos.opened_at);
            const now = new Date();
@@ -1311,9 +1728,13 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            const remainingHours = Math.max(0, RISK_PARAMS.MAX_HOLDING_HOURS - parseFloat(holdingHours));
 
 
+
+
            // 计算峰值回撤
            const peakPnlPercent = pos.peak_pnl_percent || 0;
            const drawdownFromPeak = peakPnlPercent > 0 ? peakPnlPercent - pnlPercent : 0;
+
+
 
 
            // 风险警告
@@ -1327,7 +1748,11 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            }
 
 
+
+
            prompt += `${pos.symbol} ${pos.side === 'long' ? '多' : '空'} ${pos.leverage}x | 盈亏: ${pnlPercent >= 0 ? '+' : ''}${pnlPercent.toFixed(2)}% (${pos.unrealized_pnl >= 0 ? '+' : ''}${pos.unrealized_pnl.toFixed(2)}) | 持仓: ${holdingHours}h | 剩余: ${remainingHours.toFixed(1)}h${riskWarning}\n`;
+
+
 
 
            if (peakPnlPercent > 0) {
@@ -1362,6 +1787,8 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            const daysDiff = Math.floor(hoursDiff / 24);
 
 
+
+
            let displayTime;
            if (daysDiff > 0) {
                displayTime = `${daysDiff}天前`;
@@ -1370,6 +1797,8 @@ ${isCodeLevelProtectionEnabled ? `- 双重防护：代码自动监控+AI主动�
            } else {
                displayTime = `${timeDiff}分钟前`;
            }
+
+
 
 
            prompt += `#${decision.iteration} (${displayTime}): ${decision.decision.substring(0, 60)}...\n`;
@@ -1417,7 +1846,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 你的任务是基于提供的市场数据和账户信息，完全自主地分析市场并做出交易决策。
+
+
+
+
+
+
+
+
 
 
 
@@ -1440,7 +1885,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 双重防护机制：
+
+
+
+
+
+
+
+
 
 
 
@@ -1461,9 +1922,25 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 **AI主动决策**：
 - 可在自动保护前主动操作
 - 主动风险管理是优秀交易员的标志
+
+
+
+
+
+
+
+
 
 
 
@@ -1476,6 +1953,14 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 - 单笔亏损≥${RISK_PARAMS.EXTREME_STOP_LOSS_PERCENT}%强制平仓
 - 持仓≥${RISK_PARAMS.MAX_HOLDING_HOURS}小时强制平仓
 - 最大杠杆：${RISK_PARAMS.MAX_LEVERAGE}倍
+
+
+
+
+
+
+
+
 
 
 
@@ -1498,6 +1983,14 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 交易成本：
 - 开仓手续费：约 0.05%
 - 平仓手续费：约 0.05%
@@ -1510,10 +2003,26 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 双向交易：
 - 做多（long）：预期价格上涨时开多单
 - 做空（short）：预期价格下跌时开空单
 - 永续合约做空无需借币
+
+
+
+
+
+
+
+
 
 
 
@@ -1537,7 +2046,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 这种持续的自我复盘和改进是你成为优秀交易员的关键。
+
+
+
+
+
+
+
+
 
 
 
@@ -1579,7 +2104,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 您是世界顶级的专业量化交易员，当前执行【${params.name}】策略。
+
+
+
+
+
+
+
+
 
 
 
@@ -1599,7 +2140,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 # 交易框架与市场环境
+
+
+
+
+
+
+
+
 
 
 
@@ -1613,6 +2170,14 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 - **风险偏好**：${params.riskTolerance}
 - **最大持仓**：${RISK_PARAMS.MAX_POSITIONS}个币种，${RISK_PARAMS.MAX_HOLDING_HOURS}小时强制平仓
 - **交易机制**：永续期货合约，支持双向交易
+
+
+
+
+
+
+
+
 
 
 
@@ -1635,7 +2200,23 @@ function generateInstructions(strategy: TradingStrategy, intervalMinutes: number
 
 
 
+
+
+
+
+
+
+
+
 # 策略核心原则与入场条件
+
+
+
+
+
+
+
+
 
 
 
@@ -1653,6 +2234,14 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 **入场条件**：必须满足 ${params.entryCondition}
 
 
@@ -1662,7 +2251,23 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 # 专业风险管理体系
+
+
+
+
+
+
+
+
 
 
 
@@ -1682,8 +2287,24 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 交易风险管理（专业要求）
 对于每一笔交易决策，您必须明确以下信息：
+
+
+
+
+
+
+
+
 
 
 
@@ -1703,6 +2324,14 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 2. **止损位**（浮点数）：设定止损的确切价格水平
 - 应将每笔交易的损失限制在账户价值的1-3%以内
 - 设置在近期支撑位/阻力位之外，以避免过早止损
@@ -1714,9 +2343,25 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 3. **失效条件**（字符串）：使您的交易策略失效的特定市场信号
 - 示例："价格跌破关键支撑位"、"RSI出现背离信号"、"技术形态失效"
 - 必须客观且可观察
+
+
+
+
+
+
+
+
 
 
 
@@ -1738,7 +2383,23 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 # 专业交易员智慧与决策框架
+
+
+
+
+
+
+
+
 
 
 
@@ -1751,6 +2412,14 @@ ${strategySpecificContent}
 - **核心指标**：价格、EMA、MACD、RSI、布林带
 - **时间框架**：多时间框架综合分析（1h、30m、15m、5m）
 - **辅助数据**：根据需要调用 getFundingRate 和 getOrderBook
+
+
+
+
+
+
+
+
 
 
 
@@ -1774,6 +2443,14 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 仓位管理规则
 - **严禁双向持仓**：同一币种不能同时持有多单和空单
 - **允许加仓**：对盈利>5%的持仓，趋势强化时可加仓
@@ -1786,7 +2463,23 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 # 关键决策流程
+
+
+
+
+
+
+
+
 
 
 
@@ -1808,7 +2501,23 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 # 执行要求与专业素养
+
+
+
+
+
+
+
+
 
 
 
@@ -1829,10 +2538,26 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 灵活调整能力
 - 在风控底线内根据市场情况灵活调整策略
 - 策略框架是参考基准，您有权根据市场实际情况灵活调整
 - 但风控底线绝不妥协
+
+
+
+
+
+
+
+
 
 
 
@@ -1850,8 +2575,24 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 市场数据工具
 - getMarketPrice、getTechnicalIndicators、getFundingRate、getOrderBook
+
+
+
+
+
+
+
+
 
 
 
@@ -1872,6 +2613,14 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 持仓管理工具
 - openPosition（市价单）、closePosition（市价单）、cancelOrder
 
@@ -1882,8 +2631,24 @@ ${strategySpecificContent}
 
 
 
+
+
+
+
+
+
+
+
 ## 账户信息工具
 - getAccountBalance、getPositions、getOpenOrders
+
+
+
+
+
+
+
+
 
 
 
@@ -1949,11 +2714,15 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
        ];
 
 
+
+
        // 根据环境变量决定是否启用视觉模式识别Agent
        const enableVisualPatternAgent = process.env.ENABLE_VISUAL_PATTERN_AGENT !== 'false';
        if (enableVisualPatternAgent) {
            agents.push(createPatternRecognizerAgent(marketDataContext));
        }
+
+
 
 
        subAgents = await Promise.all(agents);
@@ -1972,8 +2741,12 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
        const {createPatternRecognizerAgent} = await import("./analysisAgents");
 
 
+
+
        // 创建专门的视觉模式识别Agent
        const agent = await createPatternRecognizerAgent(marketDataContext);
+
+
 
 
        logger.info("视觉模式识别Agent创建完成");

@@ -130,6 +130,8 @@ export interface StrategyParams {
   
   /** 峰值回撤保护阈值（百分比），盈利从峰值回撤达到此值时强烈建议平仓 */
   peakDrawdownProtection: number;
+
+  baseThreshold?:number;
   
   /** 波动率调整系数，根据市场波动率动态调整杠杆和仓位 */
   volatilityAdjustment: {

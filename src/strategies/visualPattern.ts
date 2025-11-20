@@ -17,7 +17,11 @@
 */
 
 
-import type { StrategyParams, StrategyPromptContext } from "./types";
+
+
+import type {StrategyParams, StrategyPromptContext} from "./types";
+
+
 
 
 /**
@@ -41,85 +45,101 @@ import type { StrategyParams, StrategyPromptContext } from "./types";
 * @returns 视觉模式识别策略的完整参数配置
 */
 export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
- // 计算策略的杠杆范围：使用 60%-85% 的最大杠杆
- const levMin = Math.max(2, Math.ceil(maxLeverage * 0.60));  // 最小杠杆：60%最大杠杆，至少2倍
- const levMax = Math.max(3, Math.ceil(maxLeverage * 0.85));  // 最大杠杆：85%最大杠杆，至少3倍
+   // 计算策略的杠杆范围：使用 60%-85% 的最大杠杆
+   const levMin = Math.max(2, Math.ceil(maxLeverage * 0.60));  // 最小杠杆：60%最大杠杆，至少2倍
+   const levMax = Math.max(3, Math.ceil(maxLeverage * 0.85));  // 最大杠杆：85%最大杠杆，至少3倍
 
- // 计算不同信号强度下推荐的杠杆倍数
- const levNormal = levMin;  // 普通信号：使用最小杠杆
- const levGood = Math.ceil((levMin + levMax) / 2);  // 良好信号：使用中等杠杆
- const levStrong = levMax;  // 强信号：使用最大杠杆
 
- return {
-   // ==================== 策略基本信息 ====================
-   name: "视觉模式识别策略",
-   description: "基于AI视觉模型分析K线图形态，识别经典交易模式，结合技术指标验证，追求高胜率交易",
-  
-   // ==================== 杠杆配置 ====================
-   leverageMin: levMin,
-   leverageMax: levMax,
-   leverageRecommend: {
-     normal: `${levNormal}倍`,
-     good: `${levGood}倍`,
-     strong: `${levStrong}倍`,
-   },
-  
-   // ==================== 仓位配置 ====================
-   positionSizeMin: 20,
-   positionSizeMax: 28,
-   positionSizeRecommend: {
-     normal: "20-22%",
-     good: "22-25%",
-     strong: "25-28%",
-   },
-  
-   // ==================== 止损配置 ====================
-  stopLoss: {
-    low: -8.0,    // 低杠杆时：亏损8.0%止损（原5.5%）
-    mid: -10.0,   // 中杠杆时：亏损10.0%止损（原6.5%）
-    high: -12.0,  // 高杠杆时：亏损12.0%止损（原7.5%）
-  },
-  
-  // ==================== 移动止盈配置 ====================
-  trailingStop: {
-    level1: { trigger: 15, stopAt: 8 },   // 盈利达到 +15% 时，止损线移至 +8%（原12%→6%）
-    level2: { trigger: 25, stopAt: 15 }, // 盈利达到 +25% 时，止损线移至 +15%（原20%→12%）
-    level3: { trigger: 40, stopAt: 25 }, // 盈利达到 +40% 时，止损线移至 +25%（原32%→20%）
-  },
-  
-  // ==================== 分批止盈配置 ====================
-  partialTakeProfit: {
-    stage1: { trigger: 35, closePercent: 30 },   // +35%时平仓30%（原28%）
-    stage2: { trigger: 50, closePercent: 40 },   // +50%时平仓剩余40%（原40%）
-    stage3: { trigger: 70, closePercent: 100 },  // +70%时全部清仓（原55%）
-  },
-  
-   // ==================== 峰值回撤保护 ====================
-   peakDrawdownProtection: 30,
-  
-   // ==================== 波动率调整 ====================
-   volatilityAdjustment: {
-     highVolatility: {
-       leverageFactor: 0.7,
-       positionFactor: 0.75
-     },
-     normalVolatility: {
-       leverageFactor: 1.0,
-       positionFactor: 1.0
-     },
-     lowVolatility: {
-       leverageFactor: 1.2,
-       positionFactor: 1.1
-     },
-   },
-  
-   // ==================== 策略规则描述 ====================
-   entryCondition: "识别出明确的K线图形态信号，且技术指标验证有效",
-   riskTolerance: "单笔交易风险控制在20-28%之间，基于形态识别的高胜率特性",
-   tradingStyle: "基于形态识别信号入场，追求高质量交易机会",
-  
-   // ==================== 代码级保护开关 ====================
-   enableCodeLevelProtection: true,
-   allowAiOverrideProtection: true
- };
+   // 计算不同信号强度下推荐的杠杆倍数
+   const levNormal = levMin;  // 普通信号：使用最小杠杆
+   const levGood = Math.ceil((levMin + levMax) / 2);  // 良好信号：使用中等杠杆
+   const levStrong = levMax;  // 强信号：使用最大杠杆
+
+
+   return {
+       // ==================== 策略基本信息 ====================
+       name: "视觉模式识别策略",
+       description: "基于AI视觉模型分析K线图形态，识别经典交易模式，结合技术指标验证，追求高胜率交易",
+
+
+       // ==================== 杠杆配置 ====================
+       leverageMin: levMin,
+       leverageMax: levMax,
+       leverageRecommend: {
+           normal: `${levNormal}倍`,
+           good: `${levGood}倍`,
+           strong: `${levStrong}倍`,
+       },
+
+
+       // ==================== 仓位配置 ====================
+       positionSizeMin: 20,
+       positionSizeMax: 28,
+       positionSizeRecommend: {
+           normal: "20-22%",
+           good: "22-25%",
+           strong: "25-28%",
+       },
+
+
+       // ==================== 止损配置 ====================
+       stopLoss: {
+           low: -5.0,    // 低杠杆：-5%（原-8%）
+           mid: -6.5,    // 中杠杆：-6.5%（原-10%）
+           high: -8.0,   // 高杠杆：-8%（原-12%）
+       },
+
+
+       // ==================== 移动止盈配置 ====================
+       trailingStop: {
+           level1: { trigger: 6, stopAt: 3 },   // 6%盈利 → 锁定3%（4x杠杆下价格波动1.5%）
+           level2: { trigger: 10, stopAt: 6 },  // 10% → 锁定6%
+           level3: { trigger: 15, stopAt: 10 }, // 15% → 锁定10%
+       },
+
+
+       // ==================== 分批止盈配置 ====================
+       partialTakeProfit: {
+           stage1: { trigger: 8, closePercent: 30 },   // 8%时平30%
+           stage2: { trigger: 12, closePercent: 40 },  // 12%时平40%
+           stage3: { trigger: 20, closePercent: 100 }, // 20%时清仓
+       },
+
+
+       // ==================== 峰值回撤保护 ====================
+       peakDrawdownProtection: 15,
+
+
+       // ==================== 峰值回撤保护 ====================
+       baseThreshold: 2,
+
+
+       // ==================== 波动率调整 ====================
+       volatilityAdjustment: {
+           highVolatility: {
+               leverageFactor: 0.7,
+               positionFactor: 0.75
+           },
+           normalVolatility: {
+               leverageFactor: 1.0,
+               positionFactor: 1.0
+           },
+           lowVolatility: {
+               leverageFactor: 1.2,
+               positionFactor: 1.1
+           },
+       },
+
+
+       // ==================== 策略规则描述 ====================
+       entryCondition: "识别出明确的K线图形态信号，且技术指标验证有效",
+       riskTolerance: "单笔交易风险控制在20-28%之间，基于形态识别的高胜率特性",
+       tradingStyle: "基于形态识别信号入场，追求高质量交易机会",
+
+
+       // ==================== 代码级保护开关 ====================
+       enableCodeLevelProtection: true,
+       allowAiOverrideProtection: true
+   };
 }
+
