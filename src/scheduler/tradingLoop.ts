@@ -2160,8 +2160,19 @@ logger.info(`支持币种: ${SYMBOLS.join(", ")}`);
 
 
 
+// 执行交易决策前的检查
+function executeTradingWithCheck() {
+  if (isLowVolatilityPeriod()) {
+    const description = getLowVolatilityDescription();
+    logger.info(`跳过本次执行 - ${description}`);
+    return false;
+  }
+  executeTradingDecision();
+  return true;
+}
+
 // 立即执行一次
-executeTradingDecision();
+executeTradingWithCheck();
 
 
 
@@ -2169,14 +2180,7 @@ executeTradingDecision();
 // 设置定时任务
 const cronExpression = `*/${intervalMinutes} * * * *`;
 cron.schedule(cronExpression, () => {
-  // 检查是否为低波动时期
-  if (isLowVolatilityPeriod()) {
-    const description = getLowVolatilityDescription();
-    logger.info(`跳过本次执行 - ${description}`);
-    return;
-  }
-  
-  executeTradingDecision();
+  executeTradingWithCheck();
 });
 
 
