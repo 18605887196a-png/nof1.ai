@@ -27,7 +27,7 @@ import { createLogger } from "../utils/loggerUtils";
 import { createClient } from "@libsql/client";
 import { createTradingAgent, generateTradingPrompt, getAccountRiskConfig, getTradingStrategy, getStrategyParams } from "../agents/tradingAgent";
 import { createGateClient } from "../services/gateClient";
-import { getChinaTimeISO } from "../utils/timeUtils";
+import { getChinaTimeISO, isLowVolatilityPeriod, getLowVolatilityDescription } from "../utils/timeUtils";
 import { RISK_PARAMS } from "../config/riskParams";
 import { getQuantoMultiplier } from "../utils/contractUtils";
 
@@ -2169,6 +2169,13 @@ executeTradingDecision();
 // 设置定时任务
 const cronExpression = `*/${intervalMinutes} * * * *`;
 cron.schedule(cronExpression, () => {
+  // 检查是否为低波动时期
+  if (isLowVolatilityPeriod()) {
+    const description = getLowVolatilityDescription();
+    logger.info(`跳过本次执行 - ${description}`);
+    return;
+  }
+  
   executeTradingDecision();
 });
 
