@@ -271,7 +271,7 @@ export function calculateIndicators(candles: any[]) {
  */
 export const getMarketPriceTool = createTool({
   name: "getMarketPrice",
-  description: "获取指定币种的实时市场价格",
+  description: "获取指定交易对的实时价格信息，包括标记价格（mark price）、最新成交价等，用于评估当前价格水平、计算止损止盈和风险收益比。",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
   }),
@@ -300,7 +300,7 @@ export const getMarketPriceTool = createTool({
  */
 export const getTechnicalIndicatorsTool = createTool({
   name: "getTechnicalIndicators",
-  description: "获取指定币种的技术指标（EMA、MACD、RSI、布林带等）",
+  description: "获取指定交易对在给定周期上的技术指标（如 RSI、ATR、均线、布林带等），用于评估市场波动率、超买超卖状态和趋势强弱。尤其可用ATR估算波动率并据此设置入场价容忍带。",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
     interval: z.enum(["1m", "3m", "5m", "15m", "30m", "1h", "4h"]).default("5m").describe("K线周期"),
@@ -327,7 +327,7 @@ export const getTechnicalIndicatorsTool = createTool({
  */
 export const getFundingRateTool = createTool({
   name: "getFundingRate",
-  description: "获取指定币种的资金费率",
+  description: "获取指定永续合约的最新资金费率，用于判断多空持仓的拥挤程度和市场情绪偏向（正值偏多头，负值偏空头），以及监控极端情绪带来的潜在反向风险。",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
   }),
@@ -466,7 +466,7 @@ export const analyzeFundingRateTrendTool = createTool({
  */
 export const analyzeOrderBookDepthTool = createTool({
   name: "analyzeOrderBookDepth",
-  description: "分析指定币种的订单簿深度，包括流动性评估、大额订单识别和基于订单簿的即时支撑阻力位。核心功能：实时订单簿深度分析、流动性风险评估、大额挂单识别、基于订单簿的即时支撑阻力位、清算价位估算。技术特点：实时反映市场深度、基于大额挂单识别关键价位、流动性风险评估、买卖盘失衡分析。适用场景：短线交易决策、突破确认、流动性风险评估、即时市场深度分析。",
+  description: "分析指定交易对的订单簿深度，评估流动性并识别大额挂单，从而推断短期支撑/阻力位，评估在某价位附近下单的滑点风险和挂单结构。",
   parameters: z.object({
     symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
     depthLimit: z.number().default(50).describe("深度档位数量，默认50档"),

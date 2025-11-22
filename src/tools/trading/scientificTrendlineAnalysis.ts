@@ -736,27 +736,7 @@ function generateTradingRecommendation(
 */
 export const scientificTrendlineAnalysisTool = createTool({
    name: "scientificTrendlineAnalysis",
-   description: `科学的技术分析工具，提供专业的趋势线、支撑阻力位和价格通道分析。
-
-
-
-
-核心功能：
-1. 基于统计学的极值点识别
-2. 最小二乘法趋势线拟合与显著性检验
-3. 科学的价格通道识别
-4. 多维度趋势强度评估
-5. 风险调整的交易建议
-
-
-
-
-技术特点：
-- 使用分位数方法识别有效极值点
-- R²拟合优度检验（>0.6）
-- t检验统计显著性
-- 多因子趋势强度模型
-- 自动异常值检测与修正`,
+   description: `基于历史K线数据识别趋势方向及强度，并计算关键支撑/阻力位和价格通道。可用于区分趋势行情与区间震荡，以及寻找中短期关键价位。`,
    parameters: z.object({
        symbol: z.string().describe("交易对符号，如 BTCUSDT"),
        timeframe: z.enum(["1m", "5m", "15m", "30m", "1h", "4h", "1d"]).describe("时间周期"),
