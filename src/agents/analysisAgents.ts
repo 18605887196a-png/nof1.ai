@@ -263,7 +263,7 @@ export async function createPatternRecognizerAgent(marketDataContext?: any) {
 
 - **调用示例**：\`patternAnalysisMultiTool("BTC", ["1h", "15m"])\`
 - 从 Coinglass 抓取指定交易对/多时间周期的图表截图；
-- 调用视觉 AI 对多张截图进行综合分析（包括但不限于：K线、成交量、期货CVD、现货CVD、OI、资金费率、期货Bid/Ask Delta、右侧市场概览等）；
+- 调用视觉 AI 对多张截图进行综合分析（包括但不限于：K线、成交量、成交量分布(VRVP)、期货CVD、现货CVD、OI、资金费率、期货Bid/Ask Delta、右侧市场概览等）；
 - 返回结构化自然语言结论，按"指标拆解 → 市场结构与资金行为 → 短期方向 → 策略建议 → 风险提示"展开，并**必须包含**：
 - **趋势阶段**：初期 / 中期 / 末期
 - **具体价格点位**：支撑位、阻力位、止损参考位（明确数字或区间，如"90,200–90,500"）
