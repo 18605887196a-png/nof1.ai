@@ -29,6 +29,7 @@ import {promisify} from 'util';
 import * as fs from 'fs';
 import * as path from 'path';
 import {captureCoingleassChart} from '../../utils/coinglassScreenshot';
+import { logDecisionConclusion } from '../../utils/decisionLogger';
 
 
 
@@ -200,6 +201,12 @@ const patternAnalysisMultiTool = tool({
            );
 
 
+           // 记录视觉决策结论
+           logDecisionConclusion('视觉', symbol, analysis, {
+               mainTimeframe,
+               entryTimeframe
+           });
+           
            // 返回综合分析结果，不包含base64图像数据以节省token
            return {
                symbol,

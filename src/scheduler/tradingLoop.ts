@@ -28,6 +28,7 @@ import { createClient } from "@libsql/client";
 import { createTradingAgent, generateTradingPrompt, getAccountRiskConfig, getTradingStrategy, getStrategyParams } from "../agents/tradingAgent";
 import { createGateClient } from "../services/gateClient";
 import { getChinaTimeISO, isLowVolatilityPeriod, getLowVolatilityDescription } from "../utils/timeUtils";
+import { logDecisionConclusion } from "../utils/decisionLogger";
 import { RISK_PARAMS } from "../config/riskParams";
 import { getQuantoMultiplier } from "../utils/contractUtils";
 
@@ -1997,6 +1998,12 @@ try {
       if (allTexts.length > 0) {
         decisionText = allTexts.join('\n\n');
         logger.debug(`合并后文本总长度: ${decisionText.length}`);
+        
+        // 记录AI决策结论
+        logDecisionConclusion('AI', marketData.symbol, decisionText, {
+          intervalMinutes,
+          timestamp: new Date().toISOString()
+        });
       }
     
       // 如果没有找到文本消息，尝试其他字段
