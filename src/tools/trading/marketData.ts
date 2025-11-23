@@ -172,98 +172,115 @@ function calculateBollingerBands(prices: number[], period: number = 20, stdDev: 
  *   sum: string   // 总成交额
  * }
  */
-export function calculateIndicators(candles: any[]) {
-  if (!candles || candles.length === 0) {
-    return {
-      currentPrice: 0,
-      ema20: 0,
-      ema50: 0,
-      macd: 0,
-      rsi7: 50,
-      rsi14: 50,
-      volume: 0,
-      avgVolume: 0,
-      atr3: 0,
-      atr14: 0,
-      bbUpper: 0,
-      bbMiddle: 0,
-      bbLower: 0,
-      bbBandwidth: 0,
-      bbPosition: 50,
-    };
-  }
+export function calculateIndicators(candles: any[], symbol: string, interval: string) {
+   if (!candles || candles.length === 0) {
+       return {
+           currentPrice: 0,
+           ema20: 0,
+           ema50: 0,
+           macd: 0,
+           rsi7: 50,
+           rsi14: 50,
+           volume: 0,
+           avgVolume: 0,
+           atr3: 0,
+           atr14: 0,
+           bbUpper: 0,
+           bbMiddle: 0,
+           bbLower: 0,
+           bbBandwidth: 0,
+           bbPosition: 50,
+           atrRatio: 0
+       };
+   }
 
-  // 处理对象格式的K线数据（Gate.io API返回的是对象，不是数组）
-  const closes = candles
-    .map((c) => {
-      // 如果是对象格式（FuturesCandlestick）
-      if (c && typeof c === 'object' && 'c' in c) {
-        return Number.parseFloat(c.c);
-      }
-      // 如果是数组格式（兼容旧代码）
-      if (Array.isArray(c)) {
-        return Number.parseFloat(c[2]);
-      }
-      return NaN;
-    })
-    .filter(n => Number.isFinite(n));
 
-  const volumes = candles
-    .map((c) => {
-      // 如果是对象格式（FuturesCandlestick）
-      if (c && typeof c === 'object' && 'v' in c) {
-        const vol = Number.parseFloat(c.v);
-        // 验证成交量：必须是有限数字且非负
-        return Number.isFinite(vol) && vol >= 0 ? vol : 0;
-      }
-      // 如果是数组格式（兼容旧代码）
-      if (Array.isArray(c)) {
-        const vol = Number.parseFloat(c[1]);
-        return Number.isFinite(vol) && vol >= 0 ? vol : 0;
-      }
-      return 0;
-    })
-    .filter(n => n >= 0); // 过滤掉负数成交量
+   // 处理对象格式的K线数据（Gate.io API返回的是对象，不是数组）
+   const closes = candles
+       .map((c) => {
+           // 如果是对象格式（FuturesCandlestick）
+           if (c && typeof c === 'object' && 'c' in c) {
+               return Number.parseFloat(c.c);
+           }
+           // 如果是数组格式（兼容旧代码）
+           if (Array.isArray(c)) {
+               return Number.parseFloat(c[2]);
+           }
+           return NaN;
+       })
+       .filter(n => Number.isFinite(n));
 
-  if (closes.length === 0 || volumes.length === 0) {
-    return {
-      currentPrice: 0,
-      ema20: 0,
-      ema50: 0,
-      macd: 0,
-      rsi7: 50,
-      rsi14: 50,
-      volume: 0,
-      avgVolume: 0,
-      atr3: 0,
-      atr14: 0,
-    };
-  }
 
-  // 计算布林带指标
-  const bollingerBands = calculateBollingerBands(closes, 20, 2);
-  
-  return {
-    currentPrice: ensureFinite(closes.at(-1) || 0),
-    ema20: ensureFinite(calculateEMA(closes, 20)),
-    ema50: ensureFinite(calculateEMA(closes, 50)),
-    macd: ensureFinite(calculateMACD(closes)),
-    rsi7: ensureRange(calculateRSI(closes, 7), 0, 100, 50),
-    rsi14: ensureRange(calculateRSI(closes, 14), 0, 100, 50),
-    volume: ensureFinite(volumes.at(-1) || 0),
-    avgVolume: ensureFinite(volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0),
-    atr3: ensureFinite(calculateATR(candles, 3)),
-    atr14: ensureFinite(calculateATR(candles, 14)),
-    volumeRatio: ensureFinite(volumes.length > 0 && (volumes.reduce((a, b) => a + b, 0) / volumes.length) > 0 
-      ? (volumes.at(-1) || 0) / (volumes.reduce((a, b) => a + b, 0) / volumes.length) 
-      : 1),
-    // 布林带指标
-    bbUpper: bollingerBands.upper,
-    bbMiddle: bollingerBands.middle,
-    bbLower: bollingerBands.lower,
-    bbBandwidth: bollingerBands.bandwidth,
-    bbPosition: bollingerBands.position,
-  };
+   const volumes = candles
+       .map((c) => {
+           // 如果是对象格式（FuturesCandlestick）
+           if (c && typeof c === 'object' && 'v' in c) {
+               const vol = Number.parseFloat(c.v);
+               // 验证成交量：必须是有限数字且非负
+               return Number.isFinite(vol) && vol >= 0 ? vol : 0;
+           }
+           // 如果是数组格式（兼容旧代码）
+           if (Array.isArray(c)) {
+               const vol = Number.parseFloat(c[1]);
+               return Number.isFinite(vol) && vol >= 0 ? vol : 0;
+           }
+           return 0;
+       })
+       .filter(n => n >= 0); // 过滤掉负数成交量
+
+
+   if (closes.length === 0 || volumes.length === 0) {
+       return {
+           currentPrice: 0,
+           ema20: 0,
+           ema50: 0,
+           macd: 0,
+           rsi7: 50,
+           rsi14: 50,
+           volume: 0,
+           avgVolume: 0,
+           atr3: 0,
+           atr14: 0,
+           atrRatio: 0
+       };
+   }
+
+
+   // === 先计算所有基础指标（包括 atr14）===
+   const atr14 = ensureFinite(calculateATR(candles, 14));
+   const currentPrice = ensureFinite(closes[closes.length - 1]); // 最新收盘价
+
+
+   const atrRatio = currentPrice > 0 ? (atr14 / currentPrice) * 100 : 0; // 转换为百分比（如 0.3 表示 0.3%）
+   console.log(`ATR Ratio: ${atrRatio.toFixed(4)}% (ATR14: ${atr14.toFixed(2)}, Current Price: ${currentPrice.toFixed(2)})`);
+
+
+   // 计算布林带指标
+   const bollingerBands = calculateBollingerBands(closes, 20, 2);
+
+
+   return {
+       currentPrice: ensureFinite(closes.at(-1) || 0),
+       ema20: ensureFinite(calculateEMA(closes, 20)),
+       ema50: ensureFinite(calculateEMA(closes, 50)),
+       macd: ensureFinite(calculateMACD(closes)),
+       rsi7: ensureRange(calculateRSI(closes, 7), 0, 100, 50),
+       rsi14: ensureRange(calculateRSI(closes, 14), 0, 100, 50),
+       volume: ensureFinite(volumes.at(-1) || 0),
+       avgVolume: ensureFinite(volumes.length > 0 ? volumes.reduce((a, b) => a + b, 0) / volumes.length : 0),
+       atr3: ensureFinite(calculateATR(candles, 3)),
+       atr14: ensureFinite(calculateATR(candles, 14)),
+       volumeRatio: ensureFinite(volumes.length > 0 && (volumes.reduce((a, b) => a + b, 0) / volumes.length) > 0
+           ? (volumes.at(-1) || 0) / (volumes.reduce((a, b) => a + b, 0) / volumes.length)
+           : 1),
+       // 布林带指标
+       bbUpper: bollingerBands.upper,
+       bbMiddle: bollingerBands.middle,
+       bbLower: bollingerBands.lower,
+       bbBandwidth: bollingerBands.bandwidth,
+       bbPosition: bollingerBands.position,
+       atrRatio
+   };
 }
 
 /**
@@ -311,7 +328,7 @@ export const getTechnicalIndicatorsTool = createTool({
     const contract = `${symbol}_USDT`;
     
     const candles = await client.getFuturesCandles(contract, interval, limit);
-    const indicators = calculateIndicators(candles);
+    const indicators = calculateIndicators(candles,symbol,interval);
     
     return {
       symbol,

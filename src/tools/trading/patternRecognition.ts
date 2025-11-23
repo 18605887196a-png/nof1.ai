@@ -95,7 +95,7 @@ export async function generateCandlestickChart(
 
 
        // 计算技术指标
-       const indicators = calculateIndicators(candles);
+       const indicators = calculateIndicators(candles,symbol,timeframe);
 
 
        // 格式化K线数据，提取必要的价格信息和时间戳
@@ -1033,12 +1033,14 @@ export async function runPatternAgentMulti(
                            type: "image_url",
                            image_url: {
                                url: `data:image/png;base64,${mainChartBase64}`,
+                               detail: "high"
                            },
                        },
                        {
                            type: "image_url",
                            image_url: {
                                url: `data:image/png;base64,${entryChartBase64}`,
+                               detail: "high"
                            },
                        },
                    ],
