@@ -523,7 +523,7 @@ try {
               
                await page.mouse.move(centerX, centerY);
                await page.mouse.down();
-               await page.mouse.move(centerX - 150, centerY, { steps: 15 }); // 减少拖拽距离
+               await page.mouse.move(centerX - 200, centerY, { steps: 15 }); // 减少拖拽距离
                await page.mouse.up();
               
                logger.info('视口中心拖拽完成');
@@ -544,7 +544,7 @@ try {
                await page.mouse.down();
               
                // 拖拽动作：向左移动150像素，减少步数让动作更轻微
-               await page.mouse.move(startX - 150, startY, { steps: 15 });
+               await page.mouse.move(startX - 200, startY, { steps: 15 });
                await page.mouse.up();
               
                logger.info('图表拖拽完成');
