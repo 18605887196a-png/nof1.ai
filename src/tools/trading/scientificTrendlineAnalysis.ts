@@ -200,8 +200,8 @@ function calculateTrendLine(points: DataPoint[]): TrendLine | null {
 
 
 /**
-* 科学的局部极值点识别
-* 基于价格分位数和时间窗口
+* 科学的局部极值点识别 - 修正版
+* 识别近期的局部极值，而非历史极值
 */
 function findSignificantExtremes(prices: number[], windowSize: number = 5): {
    lows: DataPoint[];
@@ -213,63 +213,35 @@ function findSignificantExtremes(prices: number[], windowSize: number = 5): {
        index,
    }));
 
-
-
-
-   // 计算价格分位数作为参考（使用更宽松的分位数）
-   const sortedPrices = [...prices].sort((a, b) => a - b);
-   const lowerQuantile = sortedPrices[Math.floor(sortedPrices.length * 0.15)]; // 15%分位数
-   const upperQuantile = sortedPrices[Math.floor(sortedPrices.length * 0.85)]; // 85%分位数
-   const priceRange = upperQuantile - lowerQuantile;
-
-
-
-
    const lows: DataPoint[] = [];
    const highs: DataPoint[] = [];
 
-
-
-
-   // 🔧 修复：优化局部低点识别，避免平台期重复
+   // 🔧 修正：移除分位数过滤，识别所有有效的局部极值
    for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
        const current = dataPoints[i];
 
-
+       // 识别局部低点
        const isLocalMin =
            Array.from({ length: windowSize }, (_, j) => i - j - 1)
                .every(idx => dataPoints[idx].price > current.price) &&
            Array.from({ length: windowSize }, (_, j) => i + j + 1)
                .every(idx => dataPoints[idx].price >= current.price);
 
-
-       if (isLocalMin && current.price <= lowerQuantile + priceRange * 0.1) {
+       if (isLocalMin) {
            lows.push(current);
        }
-   }
 
-
-
-
-   // 🔧 修复：优化局部高点识别
-   for (let i = windowSize; i < dataPoints.length - windowSize; i++) {
-       const current = dataPoints[i];
-
-
+       // 识别局部高点
        const isLocalMax =
            Array.from({ length: windowSize }, (_, j) => i - j - 1)
                .every(idx => dataPoints[idx].price < current.price) &&
            Array.from({ length: windowSize }, (_, j) => i + j + 1)
                .every(idx => dataPoints[idx].price <= current.price);
 
-
-       if (isLocalMax && current.price >= upperQuantile - priceRange * 0.1) {
+       if (isLocalMax) {
            highs.push(current);
        }
    }
-
-
-
 
    return { lows, highs };
 }
@@ -311,6 +283,12 @@ function findSupportLines(prices: number[], minPoints: number = 3): TrendLine[] 
 
 
            if (line && line.r2 > 0.6 && line.strength > 0.5 && line.significance > 0.3) {
+               // 🔧 验证支撑线价格是否合理（低于当前价格的95%）
+               const currentPrice = prices[prices.length - 1];
+               const supportPrice = line.slope * (prices.length - 1) + line.intercept;
+               if (supportPrice > currentPrice * 0.95) {
+                   continue; // 支撑位不能太接近或高于当前价格
+               }
                supportLines.push(line);
            }
        }
@@ -363,6 +341,12 @@ function findResistanceLines(prices: number[], minPoints: number = 3): TrendLine
 
 
            if (line && line.r2 > 0.6 && line.strength > 0.5 && line.significance > 0.3) {
+               // 🔧 验证阻力线价格是否合理（高于当前价格的105%）
+               const currentPrice = prices[prices.length - 1];
+               const resistancePrice = line.slope * (prices.length - 1) + line.intercept;
+               if (resistancePrice < currentPrice * 1.05) {
+                   continue; // 阻力位不能太接近或低于当前价格
+               }
                resistanceLines.push(line);
            }
        }
@@ -892,4 +876,5 @@ export const scientificTrendlineAnalysisTool = createTool({
        }
    },
 });
+
 
