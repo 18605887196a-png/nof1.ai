@@ -89,30 +89,24 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
            high: -8.0,   // 高杠杆：-8%（原-12%）
        },
 
-
        // ==================== 移动止盈配置 ====================
-       trailingStop: {
-           level1: { trigger: 6, stopAt: 3 },   // 6%盈利 → 锁定3%（4x杠杆下价格波动1.5%）
-           level2: { trigger: 10, stopAt: 6 },  // 10% → 锁定6%
-           level3: { trigger: 15, stopAt: 10 }, // 15% → 锁定10%
-       },
+      trailingStop: {
+          level1: { trigger: 2.5, stopAt: 1.0 },   // 2.5%盈利 → 锁定1%
+          level2: { trigger: 4.0, stopAt: 2.0 },   // 4% → 锁定2%
+          level3: { trigger: 6.0, stopAt: 3.5 },   // 6% → 锁定3.5%
+      },
+// ==================== 分批止盈配置（日内波段优化）====================
+      partialTakeProfit: {
+          stage1: { trigger: 3.0, closePercent: 40 },   // 3%时平40%
+          stage2: { trigger: 5.0, closePercent: 40 },   // 5%时平40%
+          stage3: { trigger: 8.0, closePercent: 100 },  // 8%时清仓
+      },
 
-
-       // ==================== 分批止盈配置 ====================
-       partialTakeProfit: {
-           stage1: { trigger: 8, closePercent: 30 },   // 8%时平30%
-           stage2: { trigger: 12, closePercent: 40 },  // 12%时平40%
-           stage3: { trigger: 20, closePercent: 100 }, // 20%时清仓
-       },
-
-
-       // ==================== 峰值回撤保护 ====================
-       peakDrawdownProtection: 15,
-
+      // ==================== 峰值回撤保护 ====================
+      peakDrawdownProtection: 8,
 
        // ==================== 峰值回撤保护 ====================
        baseThreshold: 2,
-
 
        // ==================== 波动率调整 ====================
        volatilityAdjustment: {

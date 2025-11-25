@@ -1479,11 +1479,12 @@ export function generateTradingPrompt(data: {
                prompt += "\n";
            }
 
+          prompt += `\n请严格按当前策略参数执行盈利保护：
+- 盈利≥${params.partialTakeProfit.stage1.trigger}% → 分批止盈
+- 盈利≥${params.trailingStop.level1.trigger}% → 移动止盈 
+- 自峰值回撤≥${(params.peakDrawdownProtection * 0.7).toFixed(1)}% → 评估减仓
 
-           prompt += `\n请在本轮决策中，优先评估上述持仓是否需要：
-- 继续持有（并调整止损/止盈）；
-- 分批止盈或部分减仓；
-- 直接平仓离场.\n`;
+对每个持仓明确建议：继续持有 / 分批减仓 / 全部平仓.\n`;
        } else {
            prompt += `## 三、当前持仓\n\n当前无持仓，本轮可以更侧重新机会的筛选和布局，但仍需**严格控制风险与仓位**，避免一次性大额建仓.\n`;
        }
