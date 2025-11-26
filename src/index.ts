@@ -29,6 +29,7 @@ import { initDatabase } from "./database/init";
 import { RISK_PARAMS } from "./config/riskParams";
 import { getStrategyParams, getTradingStrategy } from "./agents/tradingAgent";
 import { initializeTerminalEncoding} from "./utils/encodingUtils";
+import { initTelegramBot } from "./services/telegramBot";
 
 // 设置时区为中国时间（Asia/Shanghai，UTC+8）
 process.env.TZ = 'Asia/Shanghai';
@@ -94,6 +95,10 @@ async function main() {
   // 8. 启动分批止盈监控器（每10秒检查一次）
   logger.info("启动分批止盈监控器...");
   startPartialProfitMonitor();
+  
+  // 9. 初始化 Telegram 机器人
+  logger.info("初始化 Telegram 机器人...");
+  await initTelegramBot();
   
   const strategy = getTradingStrategy();
   const params = getStrategyParams(strategy);

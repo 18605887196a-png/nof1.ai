@@ -88,21 +88,6 @@ export function getTradingStrategy(): TradingStrategy {
  return "balanced";
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /**
 * 生成AI自主策略的交易提示词（极简版，只提供数据和工具）
 */
@@ -128,153 +113,12 @@ function generateAiAutonomousPromptForCycle(data: {
  } = data;
  const currentTime = formatChinaTime();
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
  let prompt = `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【交易周期 #${iteration}】${currentTime}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 已运行: ${minutesElapsed} 分钟
 执行周期: 每 ${intervalMinutes} 分钟
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 【系统硬性风控底线】
@@ -2253,21 +2097,6 @@ function generateAiAutonomousPromptForCycle(data: {
  return prompt;
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /**
 * 生成交易提示词（参照 1.md 格式）
 */
@@ -2294,226 +2123,80 @@ export function generateTradingPrompt(data: {
  const currentTime = formatChinaTime();
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // 获取当前策略参数（用于每周期强调风控规则）
  const strategy = getTradingStrategy();
  const params = getStrategyParams(strategy);
 // 判断是否启用自动监控止损和移动止盈（根据策略配置）
  const isCodeLevelProtectionEnabled = params.enableCodeLevelProtection;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // 如果是AI自主策略，使用完全不同的提示词格式
  if (strategy === "ai-autonomous") {
      return generateAiAutonomousPromptForCycle(data);
  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 // 如果是视觉模式策略，使用专门的提示词格式
  if (strategy === "visual-pattern") {
      return generateVisualPatternPromptForCycle(data);
  }
 
+// ✅ 稳健型 Swing — 周期提示词生成函数（三图版 v4.2，无趋势线）
+function generateVisualPatternPromptForCycle(data: any): string {
+    const { iteration, intervalMinutes, accountInfo, positions, recentDecisions, fundingRate } = data;
+    const currentTime = formatChinaTime();
 
-   // ✅ 稳健型 Swing — 周期提示词生成函数（三图版 v4.2，无趋势线）
-   function generateVisualPatternPromptForCycle(data: any): string {
-       const {
-           minutesElapsed,
-           iteration,
-           intervalMinutes,
-           marketData,
-           accountInfo,
-           positions,
-           recentDecisions
-       } = data;
+    return `# Swing 决策周期 #${iteration} | ${currentTime}
+周期：${intervalMinutes} 分钟
+组合：1h（方向） + 15m（结构） + 5m（节奏）
+执行模式：稳健、不追单、不做震荡中心。
 
+============================================================
+【账户】
+总资产：${accountInfo.totalBalance.toFixed(2)}
+可用：${accountInfo.availableBalance.toFixed(2)}
+单笔风险 ≤ 1.5%
 
-       const currentTime = formatChinaTime();
+============================================================
+【当前持仓】  
+${
+        positions?.length
+            ? positions.map(p => {
+                const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 * (p.side === "long" ? 1 : -1) * p.leverage;
+                return `- ${p.symbol} ${p.side === "long" ? "多" : "空"} ${p.leverage}x | 浮盈亏 ${pnl.toFixed(2)}%`
+            }).join("\n")
+            : "无持仓"
+    }
 
+============================================================
+【资金费率 Funding Rate】
+当前 FR（每 8h 结算）：${fundingRate}%  
+解释：正＝多头拥挤（多单谨慎），负＝空头拥挤（空单谨慎）
 
-       let prompt = `# 日内波段交易（Swing v5.0）| 周期 #${iteration} | ${currentTime} 
-决策周期：${intervalMinutes} 分钟 
-策略：稳健 Swing（1h 主趋势 + 15m 入场结构 + 5m 微确认）
+============================================================
+【最近一次决策】
+${recentDecisions?.length ? recentDecisions[0].decision.split("\n").slice(0, 4).join("\n") : "无记录"}
 
+============================================================
+【入场要求】
+1）视觉方向明确  
+2）价格满足入场区 ± 容忍带（或接近入场区）  
+3）RR ≥ 1.2  
+4）5m ≠ 明显不利  
+5）无 RSI 极端  
+6）过去 4 根 15m 未重复开仓  
+7）Funding Rate 不出现极端逆势情况  
 
-===============================================================
-# ✅ 核心原则（v5.0）
-✅ 视觉结构 = 最终裁判 
-✅ 方向：1h 
-✅ 入场结构：15m（反打点 / 假突破 / 中继） 
-✅ 节奏：5m（仅过滤“明显不利”） 
-✅ 不追单，不抢突破 
-✅ 容忍带允许“区间附近执行” 
-✅ 止损基于 1h 
-✅ 每 4 根 15m K 同方向最多 1 次 
-✅ 动态容忍带：1.2%～2.2%
-
-
-===============================================================
-# ✅ 账户与风险
-- 总资产：${accountInfo.totalBalance.toFixed(2)} USDT
-- 可用余额：${accountInfo.availableBalance.toFixed(2)} USDT
-- 累计收益率：${accountInfo.returnPercent.toFixed(2)}%
-每笔风险 ≤ 1.5%。
-
-
-===============================================================
-# ✅ 当前持仓`;
-
-
-       if (positions?.length > 0) {
-           for (const pos of positions) {
-               const entry = pos.entry_price;
-               const side = pos.side === "long" ? "多" : "空";
-               const leverage = pos.leverage;
-
-
-               const pnlPercent =
-                   entry && pos.current_price
-                       ? ((pos.current_price - entry) / entry) *
-                       100 *
-                       (pos.side === "long" ? 1 : -1) *
-                       leverage
-                       : 0;
-
-
-               const peak = pos.peak_pnl_percent || 0;
-               const dd = peak - pnlPercent;
-
-
-               prompt += `\n- ${pos.symbol} ${side} ${leverage}x | 浮盈亏：${pnlPercent.toFixed(
-                   2
-               )}% | 峰值：${peak.toFixed(2)}% | 回撤：${dd.toFixed(2)}%`;
-           }
-           prompt += `
-
-
-请根据 Swing v5.0 原则进行持仓管理：继续/移动止损/分批止盈/平仓。
-
-
-===============================================================
-# ✅ 最近一次决策 
-`;
-       } else {
-           prompt += `（无持仓） 
-===============================================================
-# ✅ 最近一次决策 
-`;
-       }
-
-
-       if (recentDecisions?.length > 0) {
-           const last = recentDecisions[0].decision || "";
-           const lines = last.trim().split("\n");
-           prompt += lines.slice(0, 6).join("\n") + "\n";
-       } else prompt += "无记录。\n";
-
-
-       prompt += `
-===============================================================
-# ✅ Swing 入场规则（v5.0，无趋势线）
-
-
-## ✅ 1. 视觉结构（1h + 15m + 5m）= 最终裁判
-
-
-## ✅ 2. 动态容忍带（v5.0）
-容忍带 = max(1.2%, ATR14/price * 240)
-范围：±1.2%～±2.2%
-
-
-价格进入【入场区 ± 容忍带】 
-或偏离 ≤ 容忍带 * 0.6 → 视为在入场区域，可执行。
-
-
-## ✅ 3. 5m 微确认（新规则）
-只过滤“明显不利”。 
-5m = 中性 / 中性偏有利 / 中性偏不利 / 有利 → 均可执行。
-
-
-## ✅ 4. RSI 极端过滤
-仅禁仓：
-- RSI > 85 且贴近阻力 
-- RSI < 15 且贴近支撑
-
-
-## ✅ 5. 四根K限制
-同方向每 4 根 15m K 仅可开一次（除非出现新结构）。
-
-
-## ✅ 6. 开仓条件（全部满足）
-1）视觉方向明确 
-2）价格在入场区 ± 容忍带（或偏离 ≤ 容忍带 * 0.6） 
-3）无 RSI 极端 
-4）RR ≥ 1.2 
-5）未重复开仓 
-6）不与持仓冲突 
-7）5m ≠ 明显不利
-
-
-✅ 满足 → 执行 
-❌ 不满足 → 明确说明理由
-
-
-===============================================================
-# ✅ 输出格式
-【总体结论】 
-【持仓管理】 
-【新机会评估】 
+============================================================
+【输出格式】
+【总体结论】  
+【持仓管理】  
+【新机会评估】  
 【风险提示】
 
+============================================================
+开始获取视觉结构、价格、指标并做最终判断。`;
+}
 
-===============================================================
-请调用工具并基于视觉结构给出最终决策。`;
-
-
-       return prompt;
-   }
-
-
-
-
-   // 生成专业交易原则框架
+    // 生成专业交易原则框架
  const generateTradingPrinciples = () => {
      return `【专业交易原则】
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -6548,6 +6231,3 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
 
  return agent;
 }
-
-
-
