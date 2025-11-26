@@ -407,7 +407,7 @@ try {
       await page.waitForTimeout(800);
      
       // 步骤2: 点击显示出来的目标元素
-      const targetXPath = '/html/body/div[2]/div[3]/div/div[1]/div[2]/table/tr[13]/td[2]/div/div[1]/div/div[2]/div[2]/div[1]/div[2]/div/div[4]';
+      const targetXPath = '/html/body/div[2]/div[3]/div/div[1]/div[2]/table/tr[13]/td[2]/div/div[2]/div[1]/div[3]';
       logger.info(`在 iframe 中点击目标元素: ${targetXPath}`);
      
       await targetFrame.waitForSelector(`xpath=${targetXPath}`, { timeout: 3000 });
@@ -879,7 +879,7 @@ try {
  
   logger.info(`原始图片尺寸: ${originalWidth}x${originalHeight}`);
  
-  const cropWidth = Math.floor(originalWidth * 0.78);
+  const cropWidth = Math.floor(originalWidth * 0.79);
   const cropHeight = originalHeight;
  
   // 裁剪图片

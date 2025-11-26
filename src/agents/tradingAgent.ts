@@ -2141,8 +2141,21 @@ export function generateTradingPrompt(data: {
 
 // ✅ 稳健型 Swing — 周期提示词生成函数（三图版 v4.2，无趋势线）
 function generateVisualPatternPromptForCycle(data: any): string {
-    const { iteration, intervalMinutes, accountInfo, positions, recentDecisions, fundingRate } = data;
+    const { iteration, intervalMinutes, accountInfo, positions, recentDecisions, marketData } = data;
     const currentTime = formatChinaTime();
+    
+    // 从marketData中获取资金费率
+    let fundingRates: { [symbol: string]: number } = {};
+    
+    if (marketData && Object.keys(marketData).length > 0) {
+        // 收集每个币种的资金费率
+        for (const [symbol, symbolData] of Object.entries(marketData)) {
+            const data = symbolData as any;
+            if (data && data.fundingRate !== undefined) {
+                fundingRates[symbol] = data.fundingRate * 100; // 转换为百分比
+            }
+        }
+    }
 
     return `# Swing 决策周期 #${iteration} | ${currentTime}
 周期：${intervalMinutes} 分钟
@@ -2168,7 +2181,7 @@ ${
 
 ============================================================
 【资金费率 Funding Rate】
-当前 FR（每 8h 结算）：${fundingRate}%  
+当前 FR（每 8h 结算）：${Object.keys(fundingRates).length > 0 ? Object.entries(fundingRates).map(([symbol, rate]) => `${symbol}: ${rate.toFixed(2)}%`).join(', ') : '无数据'}  
 解释：正＝多头拥挤（多单谨慎），负＝空头拥挤（空单谨慎）
 
 ============================================================
