@@ -49,4 +49,4 @@ export {
 } from "./accountManagement";
 
 export { scientificTrendlineAnalysisTool } from "./scientificTrendlineAnalysis";
-export { patternAnalysisMultiTool, generateCandlestickChartTool } from "./patternRecognition";
+export { patternAnalysisTripleTool, generateCandlestickChartTool } from "./patternRecognition";
