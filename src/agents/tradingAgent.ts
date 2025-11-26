@@ -2181,7 +2181,7 @@ ${
 
 ============================================================
 【资金费率 Funding Rate】
-当前 FR（每 8h 结算）：${Object.keys(fundingRates).length > 0 ? Object.entries(fundingRates).map(([symbol, rate]) => `${symbol}: ${rate.toFixed(2)}%`).join(', ') : '无数据'}  
+当前 FR（每 8h 结算）：${Object.keys(fundingRates).length > 0 ? Object.entries(fundingRates).map(([symbol, rate]) => `${symbol}资金费率：${rate.toFixed(6)}%`).join(', ') : '无数据'}  
 解释：正＝多头拥挤（多单谨慎），负＝空头拥挤（空单谨慎）
 
 ============================================================
