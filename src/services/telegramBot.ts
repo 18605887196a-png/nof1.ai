@@ -13,7 +13,7 @@ const logger = createPinoLogger({
 
 // 代理配置 - 支持 HTTP/HTTPS 和 SOCKS5 代理
 const PROXY_URL = process.env.HTTPS_PROXY || process.env.HTTP_PROXY || process.env.ALL_PROXY;
-let httpsAgent: HttpsProxyAgent | SocksProxyAgent | undefined;
+let httpsAgent: HttpsProxyAgent<any> | SocksProxyAgent | undefined;
 
 if (PROXY_URL) {
   if (PROXY_URL.startsWith('socks://') || PROXY_URL.startsWith('socks5://') || PROXY_URL.startsWith('socks4://')) {
@@ -296,8 +296,11 @@ export async function sendAlertNotification(payload: AlertNotificationPayload) {
  * 解析视觉分析文本，提取关键信息
  */
 function parseVisionAnalysis(analysis: string): {
+  patternJudgment?: string;  // 模式判定
   mainTrend?: string;
   entryStructure?: string;
+  primaryStrategy?: string;  // 主要策略
+  secondaryStrategy?: string;  // 次要策略
   microConfirm?: string;
   fundingStructure?: string;
   signalRating?: string;
@@ -309,6 +312,12 @@ function parseVisionAnalysis(analysis: string): {
   const result: any = {};
   
   try {
+    // 提取【模式判定】
+    const patternMatch = analysis.match(/【模式判定】([\s\S]*?)(?=【|$)/);
+    if (patternMatch) {
+      result.patternJudgment = patternMatch[1].trim();
+    }
+    
     // 提取【1h 主趋势结构】
     const mainTrendMatch = analysis.match(/【1h 主趋势结构】([\s\S]*?)(?=【|$)/);
     if (mainTrendMatch) {
@@ -319,6 +328,18 @@ function parseVisionAnalysis(analysis: string): {
     const entryMatch = analysis.match(/【15m 入场结构】([\s\S]*?)(?=【|$)/);
     if (entryMatch) {
       result.entryStructure = entryMatch[1].trim().replace(/\n+/g, ' | ');
+    }
+    
+    // 提取Primary策略
+    const primaryMatch = analysis.match(/Primary：([\s\S]*?)(?=Secondary|【|$)/);
+    if (primaryMatch) {
+      result.primaryStrategy = primaryMatch[1].trim();
+    }
+    
+    // 提取Secondary策略
+    const secondaryMatch = analysis.match(/Secondary：([\s\S]*?)(?=【|$)/);
+    if (secondaryMatch) {
+      result.secondaryStrategy = secondaryMatch[1].trim();
     }
     
     // 提取【5m 微确认】
@@ -407,6 +428,13 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
   lines.push(`⏱ ${timeframes}`);
   lines.push('');
   
+  // 模式判定（重要信息）
+  if (parsed.patternJudgment) {
+    lines.push(`<b>🔶 模式判定</b>`);
+    lines.push(`  ${escapeHtml(parsed.patternJudgment)}`);
+    lines.push('');
+  }
+  
   // ════════════════════════════
   // 核心决策（高亮）
   // ════════════════════════════
@@ -442,17 +470,57 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
         lines.push(`  ⚡ ${escapeHtml(trimmed)}`);
       } else if (trimmed.includes('稳健')) {
         lines.push(`  🛡 ${escapeHtml(trimmed)}`);
+      } else if (trimmed) {
+        lines.push(`  💰 ${escapeHtml(trimmed)}`);
       }
     });
     lines.push('');
   }
   
   // ════════════════════════════
-  // 入场区（如果有）
+  // 入场区和策略（完整展示）
   // ════════════════════════════
   if (parsed.entryArea && parsed.entryArea !== '无') {
     lines.push(`<b>📍 入场区</b>`);
-    lines.push(`  ${escapeHtml(parsed.entryArea)}`);
+    const areaLines = parsed.entryArea.split('\n').filter(l => l.trim());
+    areaLines.forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith('Primary：')) {
+        lines.push(`  <b>🔷 ${escapeHtml(trimmed)}</b>`);
+      } else if (trimmed.startsWith('Secondary：')) {
+        lines.push(`  <b>🔶 ${escapeHtml(trimmed)}</b>`);
+      } else if (trimmed) {
+        lines.push(`  ${escapeHtml(trimmed)}`);
+      }
+    });
+    lines.push('');
+  }
+  
+  // 策略详情（Primary和Secondary）
+  if (parsed.primaryStrategy || parsed.secondaryStrategy) {
+    lines.push(`<b>📋 策略详情</b>`);
+    if (parsed.primaryStrategy) {
+      const primaryLines = parsed.primaryStrategy.split('\n').filter(l => l.trim());
+      primaryLines.forEach((line, idx) => {
+        const trimmed = line.trim();
+        if (idx === 0) {
+          lines.push(`  <b>🔷 Primary：</b>${escapeHtml(trimmed)}`);
+        } else {
+          lines.push(`    ${escapeHtml(trimmed)}`);
+        }
+      });
+    }
+    if (parsed.secondaryStrategy) {
+      const secondaryLines = parsed.secondaryStrategy.split('\n').filter(l => l.trim());
+      secondaryLines.forEach((line, idx) => {
+        const trimmed = line.trim();
+        if (idx === 0) {
+          lines.push(`  <b>🔶 Secondary：</b>${escapeHtml(trimmed)}`);
+        } else {
+          lines.push(`    ${escapeHtml(trimmed)}`);
+        }
+      });
+    }
     lines.push('');
   }
   
@@ -466,8 +534,8 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
     const trendParts = parsed.mainTrend.split('|').map(p => p.trim());
     lines.push(`<b>• 1h 主趋势</b>`);
     trendParts.forEach((part, idx) => {
-      if (part && idx < 3) { // 最多显示3个要点
-        lines.push(`  ${escapeHtml(part.substring(0, 70))}${part.length > 70 ? '...' : ''}`);
+      if (part) { // 完整显示所有要点，不再限制数量
+        lines.push(`  ${escapeHtml(part)}`);
       }
     });
   }
@@ -477,9 +545,9 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
     lines.push('');  // 15m 前加空行
     const entryParts = parsed.entryStructure.split('|').map(p => p.trim());
     lines.push(`<b>• 15m 入场结构</b>`);
-    entryParts.forEach((part, idx) => {
-      if (part && idx < 3) { // 最多显示3个要点
-        lines.push(`  ${escapeHtml(part.substring(0, 70))}${part.length > 70 ? '...' : ''}`);
+    entryParts.forEach((part) => {
+      if (part) { // 完整显示所有要点，不再限制数量和截断
+        lines.push(`  ${escapeHtml(part)}`);
       }
     });
   }
@@ -490,9 +558,9 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
     if (microLines.length > 0) {
       lines.push('');  // 5m 前加空行
       lines.push(`<b>• 5m 微确认</b>`);
-      microLines.slice(0, 2).forEach(line => {
+      microLines.forEach(line => { // 完整显示所有微确认信息
         const trimmed = line.trim();
-        lines.push(`  ${escapeHtml(trimmed.substring(0, 70))}${trimmed.length > 70 ? '...' : ''}`);
+        lines.push(`  ${escapeHtml(trimmed)}`);
       });
     }
   }
@@ -503,9 +571,9 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
     if (fundingLines.length > 0) {
       lines.push('');  // 资金结构前加空行
       lines.push(`<b>• 💰 资金结构</b>`);
-      fundingLines.slice(0, 2).forEach(line => {
+      fundingLines.forEach(line => { // 完整显示所有资金结构信息
         const trimmed = line.trim();
-        lines.push(`  ${escapeHtml(trimmed.substring(0, 70))}${trimmed.length > 70 ? '...' : ''}`);
+        lines.push(`  ${escapeHtml(trimmed)}`);
       });
     }
   }
@@ -725,6 +793,12 @@ export async function sendVisionAnalysisWithImages(
 
   lines.push(""); // 空行
 
+  // 添加模式判定（重要信息）
+  if (parsed.patternJudgment) {
+    lines.push(`<b>🔶 模式判定：</b>${escapeHtml(parsed.patternJudgment)}`);
+    lines.push(""); // 空行
+  }
+  
   // 添加建议方向（最重要的信息）
   if (parsed.recommendation) {
     const emoji = parsed.recommendation.includes("做多")
@@ -739,9 +813,23 @@ export async function sendVisionAnalysisWithImages(
   if (parsed.signalRating) {
     lines.push(`<b>⭐ 信号评级：</b>${escapeHtml(parsed.signalRating)}`);
   }
+  
+  lines.push(""); // 空行
+  
+  // 添加策略信息
+  if (parsed.primaryStrategy) {
+    lines.push(`<b>🔷 Primary策略：</b>${escapeHtml(parsed.primaryStrategy)}`);
+  }
+  if (parsed.secondaryStrategy) {
+    lines.push(`<b>🔶 Secondary策略：</b>${escapeHtml(parsed.secondaryStrategy)}`);
+  }
+  
+  lines.push(""); // 空行
 
-  // 添加入场区间
-  if (parsed.entryZone) {
+  // 添加入场区/入场区间
+  if (parsed.entryArea && parsed.entryArea !== '无') {
+    lines.push(`<b>📍 入场区：</b>${escapeHtml(parsed.entryArea)}`);
+  } else if (parsed.entryZone) {
     lines.push(`<b>🎯 入场区间：</b>${escapeHtml(parsed.entryZone)}`);
   }
 
