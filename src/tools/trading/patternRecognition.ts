@@ -1294,239 +1294,240 @@ export const patternAnalysisTripleTool = tool({
 });
 
 export async function runPatternAgentTriple(
-   mainChartBase64: string,     // 1h
-   entryChartBase64: string,    // 15m
-   microChartBase64: string,    // 5m
-   symbol: string,
-   enableThinking: boolean = false
+    mainChartBase64: string,     // 1h
+    entryChartBase64: string,    // 15m
+    microChartBase64: string,    // 5m
+    symbol: string,
+    enableThinking: boolean = false
 ): Promise<string> {
-   try {
-       const apiKey = process.env.VISION_API_KEY || process.env.OPENAI_API_KEY;
-       const baseUrl = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
-       const model = process.env.VISION_MODEL_NAME || "qwen3-vl-plus";
+    try {
+        const apiKey = process.env.VISION_API_KEY || process.env.OPENAI_API_KEY;
+        const baseUrl = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        const model = process.env.VISION_MODEL_NAME || "qwen3-vl-plus";
 
+        if (!mainChartBase64 || !entryChartBase64 || !microChartBase64) {
+            throw new Error("缺少图像数据（1h/15m/5m）。");
+        }
 
-       if (!mainChartBase64 || !entryChartBase64 || !microChartBase64) {
-           throw new Error("缺少图像数据（1h/15m/5m），请检查截图管道。");
-       }
+        const openai = new OpenAI({ apiKey, baseURL: baseUrl });
 
+        const response = await openai.chat.completions.create({
+            model,
+            messages: [
+                {
+                    role: "system",
+                    content: `
+你是一个机构级视觉结构识别引擎。
+任务：从三张 Coinglass 图（1h / 15m / 5m）中提取结构，不预测未来，不写故事，只做结构识别与分类。
 
-       const openai = new OpenAI({ apiKey, baseURL: baseUrl });
+================================================================
+【允许使用的视觉信号】
+你只能使用下列六类视觉信息：
+1. K线结构：趋势段、中继、箱体、假突破、LH/HL、衰竭  
+2. VPVR（左侧横向成交量分布）  
+3. 成交量 Volume  
+4. Spot CVD（现货主动买卖）  
+5. Futures CVD（永续主动买卖）  
+6. OI（持仓量）
 
+禁止使用图外数据。
 
-       const response = await openai.chat.completions.create({
-           model,
-           messages: [
-               {
-                   role: "system",
-                   content:`你是一名机构级“视觉结构分析师”，负责根据三张 Coinglass 图（1h 主趋势 + 15m 入场结构 + 5m 微节奏）输出可用于 Swing v6.0 的趋势/反打点结构分析。
+================================================================
+【OHLC（左上角数字）的正确使用方式】
 
-你的输出决定系统是否开仓，必须准确、简洁、结构化。
+OHLC（开/高/低/收）＝ 当前最新 K 线的数据标签。
 
-============================================================
-【图像有效信息（必须识别）】
+允许：
+- 使用 OHLC 判断“当前价格位于 VPVR 结构的哪个区域（POC/HVN/MVN/LVN）”
 
-你只能使用以下六类视觉信息：
+禁止：
+- 将 OHLC 当作结构点位（不能当 swing 高/低）
+- 当突破点、假突破点
+- 当 Primary 或 Secondary
+- 当支撑或阻力
+- 当趋势或反转依据
+- 当 VPVR 边界
 
-1）K线结构：趋势段、中继、箱体、假突破、LH/HL、衰竭等
-2）VPVR（高密度区＝阻力/支撑；低密度＝快速通道）
-3）成交量（Volume）
-4）Spot CVD（现货主动买卖力）
-5）Futures CVD（永续主动买卖力）
-6）OI（持仓量）
+总结：
+OHLC ＝ “当前价格定位”
+结构 ＝ “由 K 线形态 + VPVR 决定”
 
-右侧所有列表、标签、颜色装饰、数字面板必须全部忽略。
+================================================================
+【VPVR 四层结构 —— 完整版（适配 Coinglass 真实情况）】
 
-============================================================
-【极其重要：正确处理左上角 OHLC（四个数字）】
+你必须识别 VPVR 的四层结构（强 → 弱）：
 
-每张图左上角会显示（开 / 高 / 低 / 收）OHLC。
-你必须严格遵守：
+------------------------------------------------------------
+1）POC（主价值区）
+- 最粗 / 最长 / 最密集的一段柱形
+- 是主要成交集中区
+- 强支撑/阻力
+- 价格回到 POC → Reversal Mode 优先
 
-这些数字 只代表“当前最新 K 线的标签”
-不是结构点位
-不是真正的高点/低点
-不用于趋势判断
-不用于反打点
-不用于 VPVR 判断
-不用于任何入场区判断
-不用于 Swing 决策
-你必须 完全忽略 OHLC 的价格信息，
-只把它当成单根 K 线的说明文字。
+------------------------------------------------------------
+2）HVN（高成交量节点）
+- 多根连续较长柱组成
+- 成交密度中-高
+- 强次支撑/阻力
+- 可作为 15m Primary 或趋势中继区
+- 本图例：88000~90000（你的图确实是 HVN）
 
-============================================================
-【模式判定（趋势模式 vs 反打点模式）】
+------------------------------------------------------------
+3）MVN（中成交量节点）
+- 柱子较长，但连续性弱
+- 支撑强度中等
+- 用作 Trend Mode 的次级回踩区
+- 不作为反转区
+- 本图例：89500~90500（你的 90k 就是 MVN）
 
-你必须先判断当前属于：
+------------------------------------------------------------
+4）LVN（低成交量真空区）
+- 柱子稀疏 / 极短 / 不连续
+- 价格穿越快速
+- 用于 Trend Mode 的“高速通道”
+- 本图例：90500~92000
 
-Trend Mode（趋势模式）
-Reversal Mode（反打点模式）
-并写出理由。
+------------------------------------------------------------
+禁止：
+- 用 OHLC 代替 VPVR 边界
+- 将影线当作 VPVR 边界
+- 将单根长柱判成 HVN
+- 将 LVN 当支撑阻力
+- 混淆 1h / 15m VPVR
 
-【Trend Mode（趋势模式）触发条件】
+================================================================
+【CVD / OI 使用规则】
 
-满足任意 2 条即可：
+Spot CVD:
+- 主动买卖方向的核心指标（现货主导）
 
-1h 明确趋势段（突破 / 离开 VPVR 核心）
-15m 强趋势段（Impulse）或上涨中继（旗形 / 三角）
-Spot CVD 明显抬升（现货主导）
-OI 稳定或温和下降（非剧烈下降）
-VPVR 下方是真空区（LVN）
-价格突破箱体上沿并站稳
-Trend Mode 下允许更宽区间与趋势偏移。
+Futures CVD:
+- 永续方向（更偏短线）
 
-【Reversal Mode（反打点模式）触发条件】
+OI（持仓量）:
+- 加仓/减仓，趋势健康性的重要信号
 
-满足任意 1 条即可：
+允许：
+- 用于判断趋势持续性
+- 用于识别背离（顶/底背离）
+- 用于识别加仓减仓
 
-价格进入 VPVR POC 核心区
-LH/HL
-假突破 / 假跌破
-CVD 顶/底背离
-上下影拒绝
-波段衰竭
-箱体边缘信号
-Reversal Mode 是典型日内反打点操作。
+禁止：
+- 将 CVD/OI 当结构点位
+- 将 CVD/OI 当入场区
 
-============================================================
-【入场区逻辑（趋势模式与反打点模式不同）】
-
-【Trend Mode 入场区】
-
-允许结构偏移：
-
-Primary：15m 中继下沿、趋势回踩区、VPVR 边缘
-Secondary：更深的结构支撑区
-特性：
-
-区间更宽（600～1500 USD）
-可以“接近即可”
-必要时允许不给 Primary，只给 Secondary
-Trend Mode 可给“突破小仓”判断
-【Reversal Mode 入场区】
-
-需要贴近结构点：
-
-Primary：假突破/VPVR 边缘/箱体上沿/下沿
-Secondary：更宽的防守区
-区间宽度 300～1200 USD。
-
-============================================================
-【5m 微确认（过滤，不改方向）】
-
-只输出以下四选一：
-
-有利
-中性
-轻微不利
-明显不利（唯一禁止执行）
-============================================================
-【不可交易区（NO TRADE ZONE）】
-
-任意满足以下 → 输出 “入场区：无，建议观望”：
-
-价格贴 VPVR POC 核心
-三角收敛中段
-极低波动噪音区
-K线无序重叠
-假突破后的中轴粘滞区
-============================================================
-【资金结构（1 句话）】
-
-简洁描述：
-
-Spot CVD 流入/流出
-Futures CVD 强弱
-OI 增减
-是否空头回补或现货主导
-示例：
-“Spot CVD 强势上行，动能真实。”
-“OI 下降 + 价格上涨，空头回补推动。”
-
-============================================================
-【输出格式（必须严格遵守）】
-
+================================================================
 【模式判定】
+
+Trend Mode（满足任意 2 条）：
+- 1h 趋势段 / 脱离 POC/HVN
+- 15m Impulse / 中继
+- Spot CVD 上升
+- OI 稳定或温和下降
+- 当前价格位于 LVN 或远离价值区
+- K 线突破箱体并站稳
+
+Reversal Mode（满足任意 1 条）：
+- 价格重新进入 POC（最强反转信号）
+- LH/HL
+- 假突破/假跌破
+- CVD 顶/底背离
+- 上下影拒绝
+- 波段衰竭
+- 箱体边缘踩踏
+
+================================================================
+【5m 微节奏】
+必须输出以下之一：
+有利 / 中性 / 轻微不利 / 明显不利
+
+================================================================
+【不可交易区（NO TRADE）】
+以下任一情况出现 → 入场区 = “无，建议观望”：
+- 价格贴 POC 核心
+- 三角收敛中段
+- K 节奏严重重叠
+- 极低波动
+- 假突破后的中轴粘滞区
+
+================================================================
+【输出格式（必须遵守）】
+
+【模式判定】  
 Trend Mode / Reversal Mode（+ 理由）
 
-【1h 主趋势结构】
-（趋势段 / 中继 / 箱体 / 真空区 / POC 区）
+【1h 主趋势结构】  
+趋势段 / 中继 / 箱体 / POC 区 / LVN
 
-【15m 入场结构】
-（趋势段 / 中继 / 假突破 / LH/HL / 反打点）
-Primary：xxx
-Secondary：xxx（如有）
+【15m 入场结构】  
+趋势段 / 中继 / 假突破 / LH/HL  
+Primary：xxx  
+Secondary：xxx  
 
-【5m 微确认】
-（有利 / 中性 / 轻微不利 / 明显不利）
+【5m 微确认】  
+有利 / 中性 / 轻微不利 / 明显不利
 
-【资金结构简述】
-一句话
+【资金结构简述】  
+（Spot CVD / Futures CVD / OI）
 
 【信号评级（A/B/C/D + 分数）】
-必须给
 
-【建议方向】
-做多 / 做空 / 观望
+【建议方向】  
+做多 / 做空 / 观望  
 
-【入场区】
-Primary
-Secondary
-或 “无”
+【入场区】  
+Primary：xxx  
+Secondary：xxx  
+不可交易区 → “无，建议观望”
 
-【风险提示】
-最多 1–2 条
+【风险提示】  
+最多 2 条
 
-============================================================
-【禁止事项】
+================================================================
+【禁止】
+- OHLC 作为结构点
+- 图外数据
+- 预测未来
+- 超过 2 条风险提示
+- 混淆 Trend/Reversal
+                    `
+                },
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: `以下为 ${symbol} 的 1h / 15m / 5m 三周期图，请进行视觉结构识别：`},
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${mainChartBase64}`, detail: "high" }},
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${entryChartBase64}`, detail: "high" }},
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${microChartBase64}`, detail: "high" }},
+                    ]
+                }
+            ],
+            max_completion_tokens: 4096,
+            temperature: 0.1,
+            enable_thinking: enableThinking,
+            stream: false
+        });
 
-不得输出模糊区间
-不得输出超过 2 条风险提示
-不得让 5m 改变 1h 趋势方向
-不得在 Trend Mode 中要求反打点结构
-不得使用 OHLC（左上角）作为结构依据
-不得使用右侧面板信息
-不得废话叙述
-============================================================`
-               },
-               {
-                   role: "user",
-                   content: [
-                       { type: "text", text: `以下为 ${symbol} 的 1h（主趋势） + 15m（入场） + 5m（微确认）三张图，请按 Swing 结构分析：` },
-                       { type: "image_url", image_url: { url: `data:image/png;base64,${mainChartBase64}`, detail: "high" }},
-                       { type: "image_url", image_url: { url: `data:image/png;base64,${entryChartBase64}`, detail: "high" }},
-                       { type: "image_url", image_url: { url: `data:image/png;base64,${microChartBase64}`, detail: "high" }},
-                   ]
-               }
-           ],
-           max_completion_tokens: 4096,
-           temperature: 0.2,
-           enable_thinking: enableThinking,
-           stream: false
-       });
+        const finalContent = response.choices[0]?.message?.content?.trim();
+        if (!finalContent) throw new Error("视觉模型未返回结果。");
 
+        return finalContent;
 
-       const finalContent = response.choices[0]?.message?.content?.trim();
-       if (!finalContent) throw new Error("视觉模型未返回结果。");
-
-
-       return finalContent;
-
-
-   } catch (err) {
-       console.error(`[${symbol}] 视觉分析请求失败，转为默认观望状态:`, err);
-       return `
-【1h 主趋势结构】数据获取失败
-【15m 入场结构】无法分析
-【5m 微确认】中性
-【资金结构简述】无
-【信号评级（A/B/C/D + 分数）】D 0
-【建议方向】观望
-【入场区】无
-【风险提示】
-1. 视觉模型 API 连接异常
-2. 系统自动触发风控保护`;
-   }
+    } catch (err) {
+        console.error(`[${symbol}] 视觉分析失败，自动 fallback 到观望:`, err);
+        return `
+【模式判定】Reversal Mode（视觉分析失败）  
+【1h 主趋势结构】无  
+【15m 入场结构】无  
+Primary：无  
+Secondary：无  
+【5m 微确认】中性  
+【资金结构简述】无  
+【信号评级】D (0)  
+【建议方向】观望  
+【入场区】无  
+【风险提示】1. 视觉模型异常`;
+    }
 }
 
 export function trendModeSwitch(modeText: string): "Trend" | "Reversal" {
