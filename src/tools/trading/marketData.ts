@@ -403,34 +403,108 @@ export const getMarketPriceTool = createTool({
  },
 });
 
-
 /**
 * 获取技术指标工具
 */
 export const getTechnicalIndicatorsTool = createTool({
  name: "getTechnicalIndicators",
- description: "获取指定交易对在给定周期上的技术指标（如 RSI、ATR、均线、布林带等），用于评估市场波动率、超买超卖状态和趋势强弱。尤其可用ATR估算波动率并据此设置入场价容忍带。",
+ description: "获取指定交易对在给定周期上的技术指标（如 RSI、ATR、均线、布林带等），用于评估市场波动率、超买超卖状态和趋势强弱。尤其可用ATR估算波动率并据此设置入场价容忍带。RSI使用5分钟周期,MACD/ATR/BOLL使用15分钟周期。",
  parameters: z.object({
    symbol: z.enum(RISK_PARAMS.TRADING_SYMBOLS).describe("币种代码"),
-   interval: z.enum(["1m", "3m", "5m", "15m", "30m", "1h", "4h"]).default("5m").describe("K线周期"),
+   interval: z.enum(["1m", "3m", "5m", "15m", "30m", "1h", "4h"]).default("5m").describe("K线周期（已废弃，系统自动使用多周期）"),
    limit: z.number().default(100).describe("K线数量"),
  }),
  execute: async ({ symbol, interval, limit }) => {
    const client = createGateClient();
    const contract = `${symbol}_USDT`;
   
-   const candles = await client.getFuturesCandles(contract, interval, limit);
-   const indicators = calculateIndicators(candles,symbol,interval);
-  
+   // 获取5分钟K线数据用于RSI计算
+   const candles5m = await client.getFuturesCandles(contract, "5m", limit);
+   
+   // 获取15分钟K线数据用于MACD、ATR、BOLL计算
+   const candles15m = await client.getFuturesCandles(contract, "15m", limit);
+   
+   // 从5分钟数据计算RSI
+   const closes5m = candles5m
+     .map((c) => {
+       if (c && typeof c === 'object' && 'c' in c) {
+         return Number.parseFloat(c.c);
+       }
+       if (Array.isArray(c)) {
+         return Number.parseFloat(c[2]);
+       }
+       return NaN;
+     })
+     .filter(n => Number.isFinite(n));
+   
+   const rsi7_5m = ensureRange(calculateRSI(closes5m, 7), 0, 100, 50);
+   const rsi14_5m = ensureRange(calculateRSI(closes5m, 14), 0, 100, 50);
+   
+   // 从15分钟数据计算其他指标
+   const closes15m = candles15m
+     .map((c) => {
+       if (c && typeof c === 'object' && 'c' in c) {
+         return Number.parseFloat(c.c);
+       }
+       if (Array.isArray(c)) {
+         return Number.parseFloat(c[2]);
+       }
+       return NaN;
+     })
+     .filter(n => Number.isFinite(n));
+   
+   const volumes15m = candles15m
+     .map((c) => {
+       if (c && typeof c === 'object' && 'v' in c) {
+         const vol = Number.parseFloat(c.v);
+         return Number.isFinite(vol) && vol >= 0 ? vol : 0;
+       }
+       if (Array.isArray(c)) {
+         const vol = Number.parseFloat(c[1]);
+         return Number.isFinite(vol) && vol >= 0 ? vol : 0;
+       }
+       return 0;
+     })
+     .filter(n => n >= 0);
+   
+   // 计算15分钟周期的指标
+   const currentPrice = ensureFinite(closes15m[closes15m.length - 1]);
+   const ema20_15m = ensureFinite(calculateEMA(closes15m, 20));
+   const ema50_15m = ensureFinite(calculateEMA(closes15m, 50));
+   const macd_15m = ensureFinite(calculateMACD(closes15m));
+   const atr3_15m = ensureFinite(calculateATR(candles15m, 3));
+   const atr14_15m = ensureFinite(calculateATR(candles15m, 14));
+   const bollingerBands_15m = calculateBollingerBands(closes15m, 20, 2);
+   
+   const atrRatio = currentPrice > 0 ? (atr14_15m / currentPrice) * 100 : 0;
+   console.log(`[多周期指标] RSI(5m): ${rsi14_5m.toFixed(2)}, MACD(15m): ${macd_15m.toFixed(4)}, ATR(15m): ${atr14_15m.toFixed(2)}, ATR Ratio: ${atrRatio.toFixed(4)}%`);
+   
    return {
      symbol,
-     interval,
-     ...indicators,
+     interval: "multi-timeframe (RSI:5m, Others:15m)",
+     currentPrice,
+     ema20: ema20_15m,
+     ema50: ema50_15m,
+     macd: macd_15m,
+     rsi7: rsi7_5m,
+     rsi14: rsi14_5m,
+     volume: ensureFinite(volumes15m.at(-1) || 0),
+     avgVolume: ensureFinite(volumes15m.length > 0 ? volumes15m.reduce((a, b) => a + b, 0) / volumes15m.length : 0),
+     atr3: atr3_15m,
+     atr14: atr14_15m,
+     volumeRatio: ensureFinite(volumes15m.length > 0 && (volumes15m.reduce((a, b) => a + b, 0) / volumes15m.length) > 0
+       ? (volumes15m.at(-1) || 0) / (volumes15m.reduce((a, b) => a + b, 0) / volumes15m.length)
+       : 1),
+     bbUpper: bollingerBands_15m.upper,
+     bbMiddle: bollingerBands_15m.middle,
+     bbLower: bollingerBands_15m.lower,
+     bbBandwidth: bollingerBands_15m.bandwidth,
+     bbPosition: bollingerBands_15m.position,
+     atrRatio,
      timestamp: new Date().toISOString(),
    };
  },
 });
-
 
 /**
 * 获取资金费率工具
