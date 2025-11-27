@@ -443,7 +443,8 @@ export async function sendVisionAnalysisNotification(payload: VisionAnalysisNoti
                 : parsed.recommendation.includes('做空') ? '📉' 
                 : '⏸️';
     lines.push(`╔═══════════════════╗`);
-    lines.push(`║ <b>${emoji} ${escapeHtml(parsed.recommendation)}</b>`);
+    lines.push(`║ <b>${emoji} 建议方向</b>`);
+    lines.push(`║ ${escapeHtml(parsed.recommendation)}`);
     if (parsed.signalRating) {
       lines.push(`║ ⭐ ${escapeHtml(parsed.signalRating)}`);
     }
@@ -799,16 +800,6 @@ export async function sendVisionAnalysisWithImages(
     lines.push(""); // 空行
   }
   
-  // 添加建议方向（最重要的信息）
-  if (parsed.recommendation) {
-    const emoji = parsed.recommendation.includes("做多")
-      ? "📈"
-      : parsed.recommendation.includes("做空")
-        ? "📉"
-        : "⏸️";
-    lines.push(`<b>${emoji} 建议方向：</b>${escapeHtml(parsed.recommendation)}`);
-  }
-
   // 添加信号评级
   if (parsed.signalRating) {
     lines.push(`<b>⭐ 信号评级：</b>${escapeHtml(parsed.signalRating)}`);
