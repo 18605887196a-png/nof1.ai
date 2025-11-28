@@ -1595,3 +1595,213 @@ export function extractModeFromAnalysis(analysis: string): string {
     // 3）兜底：如果找不到，就返回整段给 trendModeSwitch 处理
     return analysis.slice(0, 100);
 }
+
+export const patternAnalysisHFVisualTool = tool({
+    name: "patternAnalysisHFVisual",
+    description: "基于 Coinglass 高频两周期（5m/1m），自动捕获图表并进行高频微结构识别（Support/Resistance、HL/LH、CVD/OI 微趋势）。适用于 HF-MicroTrader 高频/中频策略。",
+
+    parameters: z.object({
+        symbol: z.enum([
+            "BTC", "ETH", "SOL", "BNB",
+            "ADA", "XRP", "DOGE", "AVAX",
+            "DOT", "MATIC"
+        ]).describe("交易币种"),
+
+        fastTimeframe: z.enum(["5m"]).default("5m"),
+        microTimeframe: z.enum(["1m"]).default("1m"),
+
+        enableThinking: z.boolean().optional().default(false)
+    }),
+
+    execute: async ({ symbol, fastTimeframe, microTimeframe, enableThinking }) => {
+        try {
+
+            // ====================================================================
+            // ① 捕获两张图（5m + 1m）
+            // ====================================================================
+            const [
+                fastChartBase64,
+                microChartBase64
+            ] = await Promise.all([
+                captureCoingleassChart(symbol, fastTimeframe),  // 5m
+                captureCoingleassChart(symbol, microTimeframe)  // 1m
+            ]);
+
+            // ====================================================================
+            // ② 调用 HF 视觉引擎（runHFVisualAgent）
+            // ====================================================================
+            const analysis = await runHFVisualAgent(
+                fastChartBase64,
+                microChartBase64,
+                symbol,
+                enableThinking
+            );
+
+            // ====================================================================
+            // ③ 提取可交易性（long/short/no-trade）
+            // ====================================================================
+            const tradability = extractHFTradability(analysis);
+
+            // ====================================================================
+            // ④ 记录视觉决策
+            // ====================================================================
+            logDecisionConclusion("视觉（高频 5m+1m）", symbol, analysis, {
+                fastTimeframe,
+                microTimeframe
+            });
+
+            // ====================================================================
+            // ⑤ 发送 Telegram 通知（与主策略一致）
+            // ====================================================================
+            // await sendVisionAnalysisNotification({
+            //     symbol,
+            //     mainTimeframe: fastTimeframe,
+            //     entryTimeframe: microTimeframe,
+            //     microTimeframe: "1m",
+            //     analysis,
+            //     timestamp: new Date().toISOString()
+            // }).catch(err => {
+            //     logger.warn(`发送 HF 视觉分析 Telegram 通知失败: ${err.message}`);
+            // });
+
+            // ====================================================================
+            // ⑥ 返回结构（不包含 base64 图，节省 token）
+            // ====================================================================
+            return {
+                symbol,
+                fastTimeframe,
+                microTimeframe,
+                analysis,
+                tradability,       // long / short / no-trade
+                timestamp: new Date().toISOString(),
+                success: true
+            };
+
+        } catch (err: any) {
+
+            logger.error(`HF 视觉分析失败: ${err}`);
+
+            return {
+                symbol,
+                fastTimeframe,
+                microTimeframe,
+                error: err instanceof Error ? err.message : String(err),
+                timestamp: new Date().toISOString(),
+                success: false
+            };
+        }
+    }
+});
+
+export async function runHFVisualAgent(
+    chart5mBase64: string,
+    chart1mBase64: string,
+    symbol: string,
+    enableThinking: boolean = false
+): Promise<string> {
+    try {
+        const apiKey = process.env.VISION_API_KEY || process.env.OPENAI_API_KEY;
+        const baseUrl = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        const model = process.env.VISION_MODEL_NAME || "qwen3-vl-plus";
+
+        if (!chart5mBase64 || !chart1mBase64) {
+            throw new Error("缺少图像数据（5m/1m）。");
+        }
+
+        const openai = new OpenAI({ apiKey, baseURL: baseUrl });
+
+        const response = await openai.chat.completions.create({
+            model,
+            max_completion_tokens: 4096,
+            messages: [
+                {
+                    role: "system",
+                    content: `
+你是一个 5m + 1m 微结构视觉分析器（HF‑MicroTrend Visual Engine）。
+任务：从两张 Coinglass 图表（5m / 1m）中识别短线结构，用于日内 / 高频微结构交易。
+禁止预测未来，只能进行结构识别。
+
+========================================================
+【必须识别结构】
+1. 微结构点：HL / LH、小趋势、小箱体  
+2. LVN / HVN / 微 POC  
+3. Micro Support / Micro Resistance（必须是明确区间，如 "90500 - 90800"）  
+4. Spot CVD / Futures CVD 微趋势（上拐 / 下拐 / 横盘）  
+5. OI 微趋势（上升 / 下降 / 横盘）  
+6. Volume（放大 / 正常 / 低迷）  
+7. 微节奏（有利 / 中性 / 轻微不利 / 明显不利）  
+8. 小假突破 / 小假跌破（fake breakout / fake breakdown）  
+
+========================================================
+【禁止】
+- 禁止含糊描述，例如「一带 / 附近 / 区域」  
+- 禁止预测未来  
+- 禁止交易建议  
+- 禁止使用图外数据  
+
+========================================================
+【输出格式】
+
+【微结构判定】  
+（描述箱体、小趋势、假突破、LVN/HVN 等）
+
+【关键区间】  
+Micro Support：xxxx - xxxx  
+Micro Resistance：xxxx - xxxx  
+
+【HL/LH 结构】  
+HL：有/无  
+LH：有/无  
+
+【CVD / OI】  
+Spot CVD：上拐/下拐/横盘  
+Futures CVD：上拐/下拐/横盘  
+OI：上升/下降/横盘  
+
+【5m/1m 微节奏】  
+有利 / 中性 / 轻微不利 / 明显不利  
+
+【可交易性】  
+可交易（多） / 可交易（空） / 禁止交易（噪音/POC）
+`
+                },
+                {
+                    role: "user",
+                    content: [
+                        { type: "text", text: `请对 ${symbol} 的 5m / 1m 图进行高频结构识别：` },
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart5mBase64}`, detail: "high" }},
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart1mBase64}`, detail: "high" }},
+                    ]
+                }
+            ],
+            temperature: 0.1,
+            enable_thinking: enableThinking
+        });
+
+        const result = response.choices[0]?.message?.content ?? "";
+        return result.trim();
+
+    } catch (err) {
+        console.error(`[${symbol}] HF视觉分析失败:`, err);
+        return `
+【微结构判定】无  
+【关键区间】  
+Micro Support：无  
+Micro Resistance：无  
+【HL/LH】无  
+【CVD/OI】无  
+【微节奏】中性  
+【可交易性】禁止交易`;
+    }
+}
+
+// ========== HF 模式辅助（可选，如果你要解析“可交易性”） ==========
+function extractHFTradability(text: string): string {
+    if (!text) return "unknown";
+
+    if (text.includes("可交易（多")) return "long";
+    if (text.includes("可交易（空")) return "short";
+    if (text.includes("禁止") || text.includes("不可")) return "no-trade";
+
+    return "unknown";
+}

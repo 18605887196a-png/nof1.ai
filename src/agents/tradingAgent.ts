@@ -2139,74 +2139,139 @@ export function generateTradingPrompt(data: {
      return generateVisualPatternPromptForCycle(data);
  }
 
-// ✅ 稳健型 Swing — 周期提示词生成函数（三图版 v4.2，无趋势线）
-function generateVisualPatternPromptForCycle(data: any): string {
-    const { iteration, intervalMinutes, accountInfo, positions, recentDecisions, marketData } = data;
-    const currentTime = formatChinaTime();
-    
-    // 从marketData中获取资金费率
-    let fundingRates: { [symbol: string]: number } = {};
-    
-    if (marketData && Object.keys(marketData).length > 0) {
-        // 收集每个币种的资金费率
-        for (const [symbol, symbolData] of Object.entries(marketData)) {
-            const data = symbolData as any;
-            if (data && data.fundingRate !== undefined) {
-                fundingRates[symbol] = data.fundingRate * 100; // 转换为百分比
+ function generateVisualPatternPromptForCycle(data: any): string {
+        const {
+            iteration,
+            intervalMinutes,
+            accountInfo,
+            positions,
+            recentDecisions,
+            marketData,
+            visualData,
+            tradability
+        } = data;
+
+        const currentTime = formatChinaTime();
+
+        let fundingRates: { [symbol: string]: number } = {};
+        if (marketData) {
+            for (const [symbol, symbolData] of Object.entries(marketData)) {
+                const d = symbolData as any;
+                if (d && d.fundingRate !== undefined) {
+                    fundingRates[symbol] = d.fundingRate * 100;
+                }
             }
         }
-    }
 
-    return `# Swing 决策周期 #${iteration} | ${currentTime}
-周期：${intervalMinutes} 分钟
-组合：1h（方向） + 15m（结构） + 5m（节奏）
-执行模式：稳健、不追单、不做震荡中心。
+        return `
+# HF-MicroTrader 决策周期 #${iteration} | ${currentTime}
+执行频率：${intervalMinutes} 分钟（当前为 5 分钟）
+核心结构：5m（微结构） + 1m（微节奏）
 
 ============================================================
 【账户】
 总资产：${accountInfo.totalBalance.toFixed(2)}
 可用：${accountInfo.availableBalance.toFixed(2)}
-单笔风险 ≤ 1.5%
+单笔风险：0.10～0.25 仓位
 
 ============================================================
-【当前持仓】  
+【当前持仓】
 ${
-        positions?.length
-            ? positions.map(p => {
-                const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 * (p.side === "long" ? 1 : -1) * p.leverage;
-                return `- ${p.symbol} ${p.side === "long" ? "多" : "空"} ${p.leverage}x | 浮盈亏 ${pnl.toFixed(2)}%`
-            }).join("\n")
-            : "无持仓"
-    }
+            positions?.length
+                ? positions.map(p => {
+                    const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 *
+                        (p.side === "long" ? 1 : -1) * p.leverage;
+                    return `- ${p.symbol} ${p.side} | 浮盈亏 ${pnl.toFixed(2)}%`;
+                }).join("\n")
+                : "无持仓"
+        }
 
 ============================================================
-【资金费率 Funding Rate】
-当前 FR（每 8h 结算）：${Object.keys(fundingRates).length > 0 ? Object.entries(fundingRates).map(([symbol, rate]) => `${symbol}资金费率：${rate.toFixed(6)}%`).join(', ') : '无数据'}  
-解释：正＝多头拥挤（多单谨慎），负＝空头拥挤（空单谨慎）
+【资金费率（FR）】
+${
+            Object.keys(fundingRates).length
+                ? Object.entries(fundingRates)
+                    .map(([s, r]) => `${s}: ${r.toFixed(6)}%`)
+                    .join("，")
+                : "无数据"
+        }
+说明：|FR| > 0.03% 时禁止开仓（拥挤方向）
 
 ============================================================
-【最近一次决策】
-${recentDecisions?.length ? recentDecisions[0].decision.split("\n").slice(0, 4).join("\n") : "无记录"}
+【上个周期决策】
+${recentDecisions?.length ? recentDecisions[0].decision : "无记录"}
 
 ============================================================
-【入场要求】
-1）视觉方向明确  
-2）价格满足入场区 ± 容忍带（或接近入场区）  
-3）RR ≥ 1.2  
-4）5m ≠ 明显不利  
-5）无 RSI 极端  
-6）过去 4 根 15m 未重复开仓  
-7）Funding Rate 不出现极端逆势情况  
+【视觉结构（来自 5m + 1m）】
+
+【关键区间】
+Micro Support：${visualData?.support ?? "无"}
+Micro Resistance：${visualData?.resistance ?? "无"}
+
+【HL / LH】
+HL：${visualData?.hl ?? "无"}
+LH：${visualData?.lh ?? "无"}
+
+【CVD】
+Spot CVD：${visualData?.spotCVD ?? "无"}
+Futures CVD：${visualData?.futuresCVD ?? "无"}
+
+【OI】
+OI：${visualData?.oi ?? "无"}
+
+【微节奏】
+${visualData?.rhythm ?? "中性"}
+
+【可交易性（视觉）】
+${tradability ?? "未知"}
+
+============================================================
+【HF-MicroTrader 入场条件】
+
+多头（满足任意 3 条）
+1. price ∈ Micro Support
+2. HL = 有
+3. Spot CVD 上拐
+4. Futures CVD 上拐
+5. mini fakeout（假跌破）
+6. Volume > 均值 1.2x
+
+空头（满足任意 3 条）
+1. price ∈ Micro Resistance
+2. LH = 有
+3. Spot CVD 下拐
+4. Futures CVD 下拐
+5. mini fake breakout
+6. Volume 放大
+
+禁止：
+- 位于 5m POC 中轴
+- HL = 无 & LH = 无
+- 微节奏 = 明显不利
+- Funding Rate 极端（>|0.03|）
+- 量极低
+- 微结构三角收敛
 
 ============================================================
 【输出格式】
-【总体结论】  
-【持仓管理】  
-【新机会评估】  
-【风险提示】
+
+【总体结论】
+- 多 / 空 / 观望
+- 入场理由（引用：Micro Support/Resistance、HL/LH、CVD、节奏、Volume）
+- 仓位大小（0.10～0.25）
+
+【持仓管理】
+- 是否继续持有
+- 是否移动止损（必须基于结构）
+
+【退出条件】
+- 止盈 / 止损 / 时间止损 / 动能止损
+
+【风险提示】（最多2条）
 
 ============================================================
-开始获取视觉结构、价格、指标并做最终判断。`;
+基于上述结构生成唯一决策。
+`;
 }
 
     // 生成专业交易原则框架
@@ -6147,59 +6212,13 @@ export async function createTradingAgent(intervalMinutes: number = 5, marketData
 // 如果是视觉模式识别策略，创建专门的视觉模式识别Agent
  if (strategy === "visual-pattern") {
      logger.info("创建视觉模式识别策略的专门Agent...");
-     const {createPatternRecognizerAgent} = await import("./analysisAgents");
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+     const {createHFMicroTraderAgent} = await import("./analysisAgents");
      // 创建专门的视觉模式识别Agent
-     const agent = await createPatternRecognizerAgent(marketDataContext);
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+     const agent = await createHFMicroTraderAgent();
 
      logger.info("视觉模式识别Agent创建完成");
      return agent;
  }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
  const agent = new Agent({
      name: "trading-agent",

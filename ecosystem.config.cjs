@@ -22,7 +22,7 @@ require('dotenv').config();
 module.exports = {
   apps: [
     {
-      name: "open-nof1.ai-multi",
+      name: "open-nof1.ai-multi-aggressive",
       script: "./dist/index.mjs",
       instances: 1,
       exec_mode: "fork",
