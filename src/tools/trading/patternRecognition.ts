@@ -1645,7 +1645,7 @@ export const patternAnalysisHFVisualTool = tool({
             // ====================================================================
             // ④ 记录视觉决策
             // ====================================================================
-            logDecisionConclusion("视觉（高频 5m+1m）", symbol, analysis, {
+            logDecisionConclusion("视觉（高频 5m+1m）决策结论", symbol, analysis, {
                 fastTimeframe,
                 microTimeframe
             });
@@ -1680,6 +1680,16 @@ export const patternAnalysisHFVisualTool = tool({
         } catch (err: any) {
 
             logger.error(`HF 视觉分析失败: ${err}`);
+
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            logger.error(`[${symbol}] HF 视觉分析失败: ${errorMessage}`);
+
+            // 记录失败决策
+            logDecisionConclusion("视觉（高频 5m+1m）失败", symbol, `错误: ${errorMessage}`, {
+                fastTimeframe,
+                microTimeframe,
+                error: true
+            });
 
             return {
                 symbol,

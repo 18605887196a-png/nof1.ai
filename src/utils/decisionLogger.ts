@@ -46,7 +46,7 @@ export function logDecisionConclusion(
     });
     
     // 生成日志内容
-    let logContent = `=== ${timestamp} - ${type}决策 - ${symbol} ===\n`;
+    let logContent = `=== ${timestamp} - ${type} - ${symbol} ===\n`;
     
     // 添加额外信息
     if (additionalInfo && Object.keys(additionalInfo).length > 0) {
@@ -54,7 +54,7 @@ export function logDecisionConclusion(
     }
     
     // 添加决策内容
-    logContent += `决策结论:\n${decisionText}\n`;
+    logContent += `结论:\n${decisionText}\n`;
     
     // 添加分隔线
     logContent += '\n' + '='.repeat(80) + '\n\n';

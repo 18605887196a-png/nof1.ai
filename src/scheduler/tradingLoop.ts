@@ -2000,7 +2000,7 @@ try {
         logger.debug(`合并后文本总长度: ${decisionText.length}`);
         
         // 记录AI决策结论
-        logDecisionConclusion('AI', marketData.symbol, decisionText, {
+        logDecisionConclusion('最终决策结论', marketData.symbol, decisionText, {
           intervalMinutes,
           timestamp: new Date().toISOString()
         });

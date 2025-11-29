@@ -81,11 +81,53 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
            strong: "25-28%",
        },
        
-     // ==================== 止损配置 ====================
+       // ==================== 止损配置 ====================
         stopLoss: {
-            low: -1.8,
-            mid: -1.2,
-            high: -0.8
+            // ========== 止损模式选择 ==========
+            // "static"  - 静态止损（一刀切，简单固定值，适合保守交易）
+            // "dynamic" - 动态止损（智能计算，根据市场波动率、结构强度、微节奏自动调整）
+            mode: "dynamic" as "static" | "dynamic",
+            
+            // ========== 静态止损配置（mode = "static" 时生效）==========
+            // 根据杠杆倍数直接映射固定止损值
+            low: -1.8,   // 低杠杆（6-7倍）
+            mid: -1.2,   // 中杠杆（8倍）
+            high: -0.8,  // 高杠杆（9倍以上）
+            
+            // ========== 动态止损计算函数（mode = "dynamic" 时生效）==========
+            /**
+             * 动态计算止损百分比（智能系统）
+             * @param symbolVolatility - 币种波动率（ATR%或最近10分钟价格变化率）
+             * @param leverage - 杠杆倍数
+             * @param structureStrength - 5m结构强度 ("strong" | "normal" | "weak")
+             * @param microRhythm - 1m微节奏状态 ("favorable" | "neutral" | "unfavorable")
+             * @returns 动态计算的止损百分比（负数，单位：%，已含杠杆）
+             */
+            calculate: (
+                symbolVolatility: number,
+                leverage: number,
+                structureStrength: "strong" | "normal" | "weak",
+                microRhythm: "favorable" | "neutral" | "unfavorable"
+            ): number => {
+                let base = -0.95;
+
+                if (leverage >= 15) base += 0.20;
+                else if (leverage >= 8) base += 0.10;
+                else if (leverage <= 6) base -= 0.35;
+
+                if (symbolVolatility > 2.0) base -= 0.25;
+                else if (symbolVolatility < 1.0) base += 0.05;
+
+                if (structureStrength === "strong") base -= 0.28;
+                if (structureStrength === "weak") base += 0.25;
+
+                // if (microRhythm === "unfavorable") return -0.55;
+
+                if (base > -0.55) base = -0.55;
+                if (base < -2.50) base = -2.50;
+
+                return Number(base.toFixed(2));
+            }
         },
 
        // ==================== 移动止盈配置 ====================

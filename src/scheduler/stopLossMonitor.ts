@@ -57,6 +57,259 @@ const dbClient = createClient({
   url: process.env.DATABASE_URL || "file:./.voltagent/trading.db",
 });
 
+// ============================================================
+// 动态止损计算函数（集成）
+// ============================================================
+
+/**
+ * 计算币种波动率（基于ATR或价格变化率）
+ */
+function calculateVolatility(symbol: string, marketData: any): number {
+  try {
+    if (!marketData || !marketData[symbol]) {
+      logger.warn(`${symbol} 市场数据不存在，使用默认波动率 1.5%`);
+      return 1.5;
+    }
+
+    const data = marketData[symbol];
+    
+    // 优先使用 ATR14 (更准确的波动率指标)
+    if (data.longerTermContext?.atr14 && data.price) {
+      const atrPercent = (data.longerTermContext.atr14 / data.price) * 100;
+      return Number(atrPercent.toFixed(2));
+    }
+    
+    // 备用：使用最近价格变化率
+    if (data.timeframes?.['5m']?.currentPrice && data.price) {
+      const priceChange = Math.abs((data.price - data.timeframes['5m'].currentPrice) / data.timeframes['5m'].currentPrice) * 100;
+      return Number(priceChange.toFixed(2));
+    }
+    
+    // 默认值
+    return 1.5;
+  } catch (error: any) {
+    logger.error(`计算 ${symbol} 波动率失败: ${error.message}`);
+    return 1.5;
+  }
+}
+
+/**
+ * 分析5m结构强度
+ */
+function analyzeStructureStrength(
+  symbol: string,
+  marketData: any
+): "strong" | "normal" | "weak" {
+  try {
+    if (!marketData || !marketData[symbol]) {
+      return "normal";
+    }
+
+    const data = marketData[symbol];
+    const tf5m = data.timeframes?.['5m'];
+    
+    if (!tf5m) {
+      return "normal";
+    }
+
+    // 分析 5m 时间框架的趋势强度
+    const price = tf5m.currentPrice;
+    const ema20 = tf5m.ema20;
+    const macd = tf5m.macd;
+    const rsi = tf5m.rsi7;
+
+    // 强趋势条件
+    const priceEmaGap = Math.abs((price - ema20) / ema20) * 100;
+    const strongTrend = priceEmaGap > 2.0 && Math.abs(macd) > 0.5 && rsi > 30 && rsi < 70;
+
+    // 弱趋势条件
+    const weakTrend = priceEmaGap < 0.5 && Math.abs(macd) < 0.2 && rsi > 45 && rsi < 55;
+
+    if (strongTrend) {
+      return "strong";
+    } else if (weakTrend) {
+      return "weak";
+    } else {
+      return "normal";
+    }
+  } catch (error: any) {
+    logger.error(`分析 ${symbol} 结构强度失败: ${error.message}`);
+    return "normal";
+  }
+}
+
+/**
+ * 分析1m微节奏状态
+ */
+function analyzeMicroRhythm(
+  symbol: string,
+  marketData: any,
+  positionSide: "long" | "short"
+): "favorable" | "neutral" | "unfavorable" {
+  try {
+    if (!marketData || !marketData[symbol]) {
+      return "neutral";
+    }
+
+    const data = marketData[symbol];
+    const tf1m = data.timeframes?.['1m'];
+    
+    if (!tf1m) {
+      return "neutral";
+    }
+
+    // 分析 1m 时间框架与持仓方向的一致性
+    const price = tf1m.currentPrice;
+    const ema20 = tf1m.ema20;
+    const macd = tf1m.macd;
+
+    // 判断 1m 趋势方向
+    const bullish1m = price > ema20 && macd > 0;
+    const bearish1m = price < ema20 && macd < 0;
+
+    // 有利：1m方向与持仓方向一致
+    if ((positionSide === "long" && bullish1m) || (positionSide === "short" && bearish1m)) {
+      return "favorable";
+    }
+
+    // 不利：1m方向与持仓方向相反
+    if ((positionSide === "long" && bearish1m) || (positionSide === "short" && bullish1m)) {
+      return "unfavorable";
+    }
+
+    // 中性：方向不明确
+    return "neutral";
+  } catch (error: any) {
+    logger.error(`分析 ${symbol} 微节奏失败: ${error.message}`);
+    return "neutral";
+  }
+}
+
+/**
+ * 计算动态止损百分比
+ */
+function calculateDynamicStopLoss(
+  symbol: string,
+  leverage: number,
+  marketData: any,
+  positionSide: "long" | "short"
+): number {
+  const strategy = getTradingStrategy();
+  const params = getStrategyParams(strategy);
+
+  // 检查策略是否支持动态止损
+  if (!params.stopLoss || typeof params.stopLoss.calculate !== 'function') {
+    logger.debug(`策略 [${params.name}] 不支持动态止损，使用静态配置`);
+    
+    // 使用静态配置（根据杠杆映射）
+    const levMin = params.leverageMin;
+    const levMax = params.leverageMax;
+    const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
+    const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
+    
+    if (leverage > midThreshold) {
+      return params.stopLoss.high;
+    } else if (leverage > lowThreshold) {
+      return params.stopLoss.mid;
+    } else {
+      return params.stopLoss.low;
+    }
+  }
+
+  // 计算市场指标
+  const volatility = calculateVolatility(symbol, marketData);
+  const structureStrength = analyzeStructureStrength(symbol, marketData);
+  const microRhythm = analyzeMicroRhythm(symbol, marketData, positionSide);
+
+  // 调用策略的动态计算函数
+  const dynamicStopLoss = params.stopLoss.calculate(
+    volatility,
+    leverage,
+    structureStrength,
+    microRhythm
+  );
+
+  logger.info(`${symbol} 动态止损计算:`);
+  logger.info(`  杠杆: ${leverage}x`);
+  logger.info(`  波动率: ${volatility.toFixed(2)}%`);
+  logger.info(`  结构强度: ${structureStrength}`);
+  logger.info(`  微节奏: ${microRhythm}`);
+  logger.info(`  动态止损: ${dynamicStopLoss.toFixed(2)}%`);
+
+  return dynamicStopLoss;
+}
+
+/**
+ * 获取止损阈值（智能选择静态或动态）
+ */
+function getDynamicStopLossThreshold(
+  symbol: string,
+  leverage: number,
+  marketData?: any,
+  positionSide?: "long" | "short"
+): { threshold: number; level: string; description: string; isDynamic: boolean } {
+  const strategy = getTradingStrategy();
+  const params = getStrategyParams(strategy);
+
+  // 检查止损配置
+  if (!params.stopLoss) {
+    throw new Error("止损配置不存在");
+  }
+
+  // ========== 检查用户配置的止损模式 ==========
+  const stopLossMode = (params.stopLoss as any).mode || "static";
+  
+  // 如果用户选择动态模式，且提供了市场数据和持仓方向
+  if (
+    stopLossMode === "dynamic" &&
+    marketData &&
+    positionSide &&
+    typeof params.stopLoss.calculate === 'function'
+  ) {
+    const dynamicThreshold = calculateDynamicStopLoss(symbol, leverage, marketData, positionSide);
+    
+    return {
+      threshold: dynamicThreshold,
+      level: "🤖 动态止损",
+      description: `智能止损: ${dynamicThreshold.toFixed(2)}% (基于波动率+结构+微节奏)`,
+      isDynamic: true,
+    };
+  }
+
+  // 否则使用静态配置（一刀切模式）
+  const levMin = params.leverageMin;
+  const levMax = params.leverageMax;
+  const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
+  const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
+
+  if (leverage > midThreshold) {
+    return {
+      threshold: params.stopLoss.high,
+      level: "📊 高杠杆静态",
+      description: `${midThreshold + 1}倍以上杠杆，固定止损 ${params.stopLoss.high}%`,
+      isDynamic: false,
+    };
+  } else if (leverage > lowThreshold) {
+    return {
+      threshold: params.stopLoss.mid,
+      level: "📊 中杠杆静态",
+      description: `${lowThreshold + 1}-${midThreshold}倍杠杆，固定止损 ${params.stopLoss.mid}%`,
+      isDynamic: false,
+    };
+  } else {
+    return {
+      threshold: params.stopLoss.low,
+      level: "📊 低杠杆静态",
+      description: `${levMin}-${lowThreshold}倍杠杆，固定止损 ${params.stopLoss.low}%`,
+      isDynamic: false,
+    };
+  }
+}
+
+// ============================================================
+// 静态止损配置函数（向后兼容，已废弃）
+// ============================================================
+
 /**
  * 根据杠杆倍数确定止损阈值
  * 直接使用策略的 stopLoss 配置，根据杠杆范围映射到 low/mid/high
@@ -475,7 +728,63 @@ async function checkStopLoss() {
     
     const now = Date.now();
     
-    // 2. 检查每个持仓
+    // 2. 检查是否需要获取市场数据（仅动态模式需要）
+    const strategy = getTradingStrategy();
+    const params = getStrategyParams(strategy);
+    const stopLossMode = (params.stopLoss as any).mode || "static";
+    const needMarketData = stopLossMode === "dynamic";
+    
+    // 3. 获取市场数据（仅在动态模式下）
+    let marketData: Record<string, any> = {};
+    
+    if (needMarketData) {
+      try {
+        // 导入市场数据工具
+        const { calculateIndicators } = await import("../tools/trading/marketData");
+        
+        logger.debug(`🤖 动态止损模式: 开始获取 ${activePositions.length} 个持仓的市场数据...`);
+        
+        // 为每个持仓币种获取市场数据
+        for (const pos of activePositions) {
+          const symbol = pos.contract.replace("_USDT", "");
+          
+          try {
+            // 获取 1m 和 5m K线数据
+            const candles1m = await gateClient.getFuturesCandles(`${symbol}_USDT`, "1m", 100);
+            const candles5m = await gateClient.getFuturesCandles(`${symbol}_USDT`, "5m", 100);
+            
+            // 计算指标
+            const indicators1m = calculateIndicators(candles1m, symbol, "1m");
+            const indicators5m = calculateIndicators(candles5m, symbol, "5m");
+            
+            // 构建市场数据结构
+            marketData[symbol] = {
+              symbol,
+              price: Number.parseFloat(pos.markPrice || "0"),
+              timeframes: {
+                '1m': indicators1m,
+                '5m': indicators5m,
+              },
+              longerTermContext: {
+                atr14: indicators5m.atr14,
+              },
+            };
+            
+            logger.debug(`  ✅ ${symbol} 市场数据获取成功`);
+          } catch (dataError: any) {
+            logger.warn(`获取 ${symbol} 市场数据失败: ${dataError.message}，将降级为静态止损`);
+          }
+        }
+        
+        logger.debug(`🤖 动态止损模式: 市场数据获取完成 (${Object.keys(marketData).length}/${activePositions.length})`);
+      } catch (importError: any) {
+        logger.warn(`导入市场数据工具失败: ${importError.message}，将使用静态止损`);
+      }
+    } else {
+      logger.debug(`📊 静态止损模式: 跳过市场数据获取`);
+    }
+    
+    // 4. 检查每个持仓
     for (const pos of activePositions) {
       const size = Number.parseInt(pos.size || "0");
       const symbol = pos.contract.replace("_USDT", "");
@@ -509,26 +818,35 @@ async function checkStopLoss() {
       history.checkCount++;
       history.lastCheckTime = now;
       
-      // 3. 检查止损条件
-      // 根据杠杆倍数确定止损阈值
-      const thresholdInfo = getStopLossThreshold(leverage);
+      // 5. 使用止损系统（根据模式自动选择静态或动态）
+      // 根据杠杆倍数和市场数据确定止损阈值
+      const thresholdInfo = getDynamicStopLossThreshold(
+        symbol,
+        leverage,
+        marketData[symbol], // 传入市场数据（如果有，动态模式会使用）
+        side as "long" | "short" // 传入持仓方向
+      );
       
       // 检查是否触发止损（亏损达到或超过止损线）
       if (pnlPercent <= thresholdInfo.threshold) {
         logger.error(`${symbol} 触发止损条件:`);
-        logger.error(`  风险等级: ${thresholdInfo.level} - ${thresholdInfo.description}`);
+        logger.error(`  止损类型: ${thresholdInfo.isDynamic ? '🤖 动态止损' : '📊 静态止损'}`);
+        logger.error(`  风险等级: ${thresholdInfo.level}`);
+        logger.error(`  止损描述: ${thresholdInfo.description}`);
         logger.error(`  杠杆倍数: ${leverage}x`);
         logger.error(`  当前亏损: ${pnlPercent.toFixed(2)}%`);
         logger.error(`  止损线: ${thresholdInfo.threshold.toFixed(2)}%`);
 
         // 记录触发止损的详细信息到决策日志
         const { logDecisionConclusion } = require('../utils/decisionLogger');
-        const stopLossInfo = `【硬止损触发】${symbol} ${side === 'long' ? '做多' : '做空'}
+        const stopLossType = thresholdInfo.isDynamic ? '动态止损' : '静态止损';
+        const stopLossInfo = `【硬止损触发 - ${stopLossType}】${symbol} ${side === 'long' ? '做多' : '做空'}
 
 ============================================================
 【触发信息】
+止损类型: ${stopLossType}
 风险等级: ${thresholdInfo.level}
-风险描述: ${thresholdInfo.description}
+止损描述: ${thresholdInfo.description}
 杠杆倍数: ${leverage}x
 开仓价格: ${entryPrice.toFixed(2)}
 当前价格: ${currentPrice.toFixed(2)}
@@ -538,19 +856,22 @@ async function checkStopLoss() {
 ============================================================
 【止损原因】
 亏损达到 ${pnlPercent.toFixed(2)}%，超过 ${thresholdInfo.level} 止损线 ${thresholdInfo.threshold.toFixed(2)}%
+${thresholdInfo.isDynamic ? '✅ 基于市场波动率、结构强度和微节奏动态计算的智能止损' : '📊 基于杠杆倍数的静态止损配置'}
 系统自动触发止损平仓保护
 
 ============================================================
 【执行操作】
 即将执行市价平仓，保护账户资金安全`;
 
-        logDecisionConclusion('AI', symbol, stopLossInfo, {
+        logDecisionConclusion('触发硬止损', symbol, stopLossInfo, {
           type: 'hard-stop-loss',
+          stopLossType: stopLossType,
           trigger: 'automatic',
           riskLevel: thresholdInfo.level,
           leverage: leverage,
           pnlPercent: pnlPercent.toFixed(2),
           threshold: thresholdInfo.threshold.toFixed(2),
+          isDynamic: thresholdInfo.isDynamic,
           timestamp: new Date().toISOString()
         });
         
@@ -578,7 +899,7 @@ async function checkStopLoss() {
       }
     }
     
-    // 4. 清理已平仓的记录
+    // 6. 清理已平仓的记录
     const activeSymbols = new Set(
       activePositions.map((p: any) => p.contract.replace("_USDT", ""))
     );
@@ -619,21 +940,33 @@ export function startStopLossMonitor() {
     return;
   }
   
+  // 获取止损模式
+  const stopLossMode = (params.stopLoss as any).mode || "static";
+  const modeText = stopLossMode === "dynamic" ? "🤖 动态智能止损" : "📊 静态固定止损";
+  
   isRunning = true;
   logger.info(`启动止损监控（自动止损系统 - ${params.name}策略）`);
   logger.info(`  当前策略: ${strategy} (${params.name})`);
-  logger.info("  检查间隔: 10秒");
-  logger.info(`  低风险: ${config.lowRisk.description}`);
-  logger.info(`  中风险: ${config.mediumRisk.description}`);
-  logger.info(`  高风险: ${config.highRisk.description}`);
+  logger.info(`  止损模式: ${modeText}`);
+  logger.info("  检查间隔: 15秒");
+  
+  if (stopLossMode === "dynamic") {
+    logger.info("  ✅ 动态止损: 根据市场波动率、5m结构强度、1m微节奏实时调整");
+    logger.info(`  基础范围: -0.55% ~ -2.30%`);
+  } else {
+    logger.info("  📊 静态止损: 根据杠杆倍数固定止损值");
+    logger.info(`  低杠杆: ${config.lowRisk.description}`);
+    logger.info(`  中杠杆: ${config.mediumRisk.description}`);
+    logger.info(`  高杠杆: ${config.highRisk.description}`);
+  }
   
   // 立即执行一次
   checkStopLoss();
   
-  // 每10秒执行一次
+  // 每15秒执行一次
   monitorInterval = setInterval(() => {
     checkStopLoss();
-  }, 30 * 1000);
+  }, 15 * 1000);
 }
 
 /**
@@ -656,4 +989,14 @@ export function stopStopLossMonitor() {
   logger.info("止损监控已停止");
 }
 
+// ============================================================
+// 导出测试函数（仅供测试脚本使用）
+// ============================================================
+
+export {
+  getDynamicStopLossThreshold,
+  calculateVolatility,
+  analyzeStructureStrength,
+  analyzeMicroRhythm,
+};
 

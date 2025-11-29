@@ -2139,7 +2139,7 @@ export function generateTradingPrompt(data: {
      return generateVisualPatternPromptForCycle(data);
  }
 
-function generateVisualPatternPromptForCycle(data: any): string {
+ function generateVisualPatternPromptForCycle(data: any): string {
         const {
             iteration,
             intervalMinutes,
@@ -2235,7 +2235,7 @@ ${recentDecisions?.length ? recentDecisions[0].decision : "无记录"}
 
         // 记录到决策日志
         const { logDecisionConclusion } = require('../utils/decisionLogger');
-        logDecisionConclusion('AI', marketData.symbol || 'BTC', prompt, {
+        logDecisionConclusion('发送给agent的交易prompt', marketData.symbol || 'BTC', prompt, {
             type: 'visual-pattern-prompt',
             iteration,
             intervalMinutes,
