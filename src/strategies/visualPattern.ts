@@ -82,11 +82,11 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
        },
        
      // ==================== 止损配置 ====================
-       stopLoss: {
-           low: -0.4,     // 轻度风控
-           mid: -0.6,     // 默认
-           high: -0.8     // 高容忍
-       },
+        stopLoss: {
+            low: -1.8,
+            mid: -1.2,
+            high: -0.8
+        },
 
        // ==================== 移动止盈配置 ====================
       trailingStop: {

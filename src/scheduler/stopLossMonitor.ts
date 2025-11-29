@@ -520,6 +520,39 @@ async function checkStopLoss() {
         logger.error(`  杠杆倍数: ${leverage}x`);
         logger.error(`  当前亏损: ${pnlPercent.toFixed(2)}%`);
         logger.error(`  止损线: ${thresholdInfo.threshold.toFixed(2)}%`);
+
+        // 记录触发止损的详细信息到决策日志
+        const { logDecisionConclusion } = require('../utils/decisionLogger');
+        const stopLossInfo = `【硬止损触发】${symbol} ${side === 'long' ? '做多' : '做空'}
+
+============================================================
+【触发信息】
+风险等级: ${thresholdInfo.level}
+风险描述: ${thresholdInfo.description}
+杠杆倍数: ${leverage}x
+开仓价格: ${entryPrice.toFixed(2)}
+当前价格: ${currentPrice.toFixed(2)}
+当前亏损: ${pnlPercent.toFixed(2)}%
+止损线: ${thresholdInfo.threshold.toFixed(2)}%
+
+============================================================
+【止损原因】
+亏损达到 ${pnlPercent.toFixed(2)}%，超过 ${thresholdInfo.level} 止损线 ${thresholdInfo.threshold.toFixed(2)}%
+系统自动触发止损平仓保护
+
+============================================================
+【执行操作】
+即将执行市价平仓，保护账户资金安全`;
+
+        logDecisionConclusion('AI', symbol, stopLossInfo, {
+          type: 'hard-stop-loss',
+          trigger: 'automatic',
+          riskLevel: thresholdInfo.level,
+          leverage: leverage,
+          pnlPercent: pnlPercent.toFixed(2),
+          threshold: thresholdInfo.threshold.toFixed(2),
+          timestamp: new Date().toISOString()
+        });
         
         // 执行止损平仓
         const success = await executeStopLossClose(

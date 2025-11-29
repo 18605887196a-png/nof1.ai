@@ -2139,7 +2139,7 @@ export function generateTradingPrompt(data: {
      return generateVisualPatternPromptForCycle(data);
  }
 
- function generateVisualPatternPromptForCycle(data: any): string {
+function generateVisualPatternPromptForCycle(data: any): string {
         const {
             iteration,
             intervalMinutes,
@@ -2177,7 +2177,7 @@ export function generateTradingPrompt(data: {
             priceSection = "\n(无市场价格数据，请 Trader 调用工具获取)";
         }
 
-        return `
+        const prompt = `
 # HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
 执行频率：${intervalMinutes} 分钟
 结构驱动：5m 主结构 + 1m 微节奏（视觉工具将在本周期由 Trader 自动调用）
@@ -2203,6 +2203,10 @@ ${
                 }).join("\n")
                 : "无持仓"
         }
+        
+============================================================
+【系统提示】
+当前持仓可能已经被系统自动处理（如部分止盈、移动止盈或保护性平仓）。请按剩余仓位继续进行结构化持仓管理，无需重建方向。
 
 ============================================================
 【资金费率（FR）】
@@ -2228,7 +2232,18 @@ ${recentDecisions?.length ? recentDecisions[0].decision : "无记录"}
 ============================================================
 请严格按照视觉分析结构生成本周期唯一交易决策。
 `;
-    }
+
+        // 记录到决策日志
+        const { logDecisionConclusion } = require('../utils/decisionLogger');
+        logDecisionConclusion('AI', marketData.symbol || 'BTC', prompt, {
+            type: 'visual-pattern-prompt',
+            iteration,
+            intervalMinutes,
+            timestamp: new Date().toISOString()
+        });
+
+        return prompt;
+}
 
     // 生成专业交易原则框架
  const generateTradingPrinciples = () => {
