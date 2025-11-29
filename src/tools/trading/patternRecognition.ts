@@ -1256,17 +1256,17 @@ export const patternAnalysisTripleTool = tool({
                microTimeframe
            });
            
-            // ✅ 发送 Telegram 通知
-           await sendVisionAnalysisNotification({
-               symbol,
-               mainTimeframe,
-               entryTimeframe,
-               microTimeframe,
-               analysis,
-               timestamp: new Date().toISOString()
-           }).catch(err => {
-               logger.warn(`发送视觉分析 Telegram 通知失败: ${err.message}`);
-           });
+        //     // ✅ 发送 Telegram 通知
+        //    await sendVisionAnalysisNotification({
+        //        symbol,
+        //        mainTimeframe,
+        //        entryTimeframe,
+        //        microTimeframe,
+        //        analysis,
+        //        timestamp: new Date().toISOString()
+        //    }).catch(err => {
+        //        logger.warn(`发送视觉分析 Telegram 通知失败: ${err.message}`);
+        //    });
 
            // ✅ 返回结构（不含base64节省token）
            return {
