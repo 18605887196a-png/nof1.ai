@@ -2146,33 +2146,51 @@ export function generateTradingPrompt(data: {
             accountInfo,
             positions,
             recentDecisions,
-            marketData,
-            visualData,
-            tradability
+            marketData
         } = data;
 
         const currentTime = formatChinaTime();
 
+        // 格式化资金费率
         let fundingRates: { [symbol: string]: number } = {};
         if (marketData) {
             for (const [symbol, symbolData] of Object.entries(marketData)) {
                 const d = symbolData as any;
-                if (d && d.fundingRate !== undefined) {
+                if (d?.fundingRate !== undefined) {
                     fundingRates[symbol] = d.fundingRate * 100;
                 }
             }
         }
 
+        // ========= 构造实时价格列表 =========
+        let priceSection = "";
+        if (marketData) {
+            for (const [symbol, raw] of Object.entries(marketData)) {
+                const md = raw as any;
+                if (md && typeof md.price === "number") {
+                    priceSection += `\n- ${symbol}（当前参考价约 ${md.price.toFixed(2)}）`;
+                } else {
+                    priceSection += `\n- ${symbol}（当前参考价未知，需通过工具查询）`;
+                }
+            }
+        } else {
+            priceSection = "\n(无市场价格数据，请 Trader 调用工具获取)";
+        }
+
         return `
-# HF-MicroTrader 决策周期 #${iteration} | ${currentTime}
-执行频率：${intervalMinutes} 分钟（当前为 5 分钟）
-核心结构：5m（微结构） + 1m（微节奏）
+# HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
+执行频率：${intervalMinutes} 分钟
+结构驱动：5m 主结构 + 1m 微节奏（视觉工具将在本周期由 Trader 自动调用）
+
+============================================================
+【实时市场价格】
+${priceSection}
 
 ============================================================
 【账户】
 总资产：${accountInfo.totalBalance.toFixed(2)}
-可用：${accountInfo.availableBalance.toFixed(2)}
-单笔风险：0.10～0.25 仓位
+可用余额：${accountInfo.availableBalance.toFixed(2)}
+建议单笔风险：账户的 10%～25% 作为开仓金额
 
 ============================================================
 【当前持仓】
@@ -2195,84 +2213,22 @@ ${
                     .join("，")
                 : "无数据"
         }
-说明：|FR| > 0.03% 时禁止开仓（拥挤方向）
+说明：当 |FR| > 0.03% 时应避免开仓（拥挤流动性方向）
 
 ============================================================
-【上个周期决策】
+【上个周期 Trader 决策】
 ${recentDecisions?.length ? recentDecisions[0].decision : "无记录"}
 
 ============================================================
-【视觉结构（来自 5m + 1m）】
-
-【关键区间】
-Micro Support：${visualData?.support ?? "无"}
-Micro Resistance：${visualData?.resistance ?? "无"}
-
-【HL / LH】
-HL：${visualData?.hl ?? "无"}
-LH：${visualData?.lh ?? "无"}
-
-【CVD】
-Spot CVD：${visualData?.spotCVD ?? "无"}
-Futures CVD：${visualData?.futuresCVD ?? "无"}
-
-【OI】
-OI：${visualData?.oi ?? "无"}
-
-【微节奏】
-${visualData?.rhythm ?? "中性"}
-
-【可交易性（视觉）】
-${tradability ?? "未知"}
+提示（重要）：
+- Trader 将在本周期内部主动调用 5m+1m 视觉工具获取最新结构  
+- 本提示仅提供账户、仓位、市场价格与历史决策  
+- Trader 需基于视觉结构输出唯一交易结论，并根据 instructions 调用工具开仓/平仓
 
 ============================================================
-【HF-MicroTrader 入场条件】
-
-多头（满足任意 3 条）
-1. price ∈ Micro Support
-2. HL = 有
-3. Spot CVD 上拐
-4. Futures CVD 上拐
-5. mini fakeout（假跌破）
-6. Volume > 均值 1.2x
-
-空头（满足任意 3 条）
-1. price ∈ Micro Resistance
-2. LH = 有
-3. Spot CVD 下拐
-4. Futures CVD 下拐
-5. mini fake breakout
-6. Volume 放大
-
-禁止：
-- 位于 5m POC 中轴
-- HL = 无 & LH = 无
-- 微节奏 = 明显不利
-- Funding Rate 极端（>|0.03|）
-- 量极低
-- 微结构三角收敛
-
-============================================================
-【输出格式】
-
-【总体结论】
-- 多 / 空 / 观望
-- 入场理由（引用：Micro Support/Resistance、HL/LH、CVD、节奏、Volume）
-- 仓位大小（0.10～0.25）
-
-【持仓管理】
-- 是否继续持有
-- 是否移动止损（必须基于结构）
-
-【退出条件】
-- 止盈 / 止损 / 时间止损 / 动能止损
-
-【风险提示】（最多2条）
-
-============================================================
-基于上述结构生成唯一决策。
+请严格按照视觉分析结构生成本周期唯一交易决策。
 `;
-}
+    }
 
     // 生成专业交易原则框架
  const generateTradingPrinciples = () => {
