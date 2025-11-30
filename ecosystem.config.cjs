@@ -27,10 +27,12 @@ module.exports = {
       instances: 1,
       exec_mode: "fork",
       watch: false,
-      autorestart: true,
-      max_restarts: 10,
-      min_uptime: "10s",
-      max_memory_restart: "500M",
+      autorestart: false,
+      max_restarts: 0,
+      min_uptime: "30s",
+      max_memory_restart: "2G",
+      // 设置Node.js运行时内存限制
+      node_args: "--max-old-space-size=2048",
       env: {
         NODE_ENV: "production",
         // 从 .env 文件加载所有环境变量
