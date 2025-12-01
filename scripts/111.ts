@@ -13,9 +13,9 @@ import * as path from 'path';
 // 测试配置
 const TEST_CONFIG = {
     symbol: 'BTC',           // 测试币种
-    timeframe: '5m',         // 测试周期
+    timeframe: '1m',         // 测试周期
     exchange: 'Gate',        // 交易所
-    offsets: [1500]  // 要测试的偏移量数组
+    offsets: [1200]  // 要测试的偏移量数组
 };
 
 async function testCoinglassOffset() {
