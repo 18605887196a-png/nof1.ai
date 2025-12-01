@@ -1625,7 +1625,7 @@ export const patternAnalysisHFVisualTool = tool({
                 microChartBase64
             ] = await Promise.all([
                 captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1200),  // 5m
-                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1000)  // 1m
+                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1200)  // 1m
             ]);
 
             // ====================================================================
