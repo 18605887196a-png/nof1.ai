@@ -88,6 +88,7 @@ export async function captureCoingleassChart(
         const t2 = Date.now();
         const page = await browser.newPage({
             viewport: {width: 1920, height: 1080},
+            deviceScaleFactor: 1,
             userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36'
         });
         timings['创建页面'] = Date.now() - t2;

@@ -130,6 +130,7 @@ async function main() {
     logger.info(`  • Level 1: 峰值达到 ${params.trailingStop.level1.trigger}% 时，回落至 ${params.trailingStop.level1.stopAt}% 平仓`);
     logger.info(`  • Level 2: 峰值达到 ${params.trailingStop.level2.trigger}% 时，回落至 ${params.trailingStop.level2.stopAt}% 平仓`);
     logger.info(`  • Level 3: 峰值达到 ${params.trailingStop.level3.trigger}% 时，回落至 ${params.trailingStop.level3.stopAt}% 平仓`);
+    logger.info(`  • Level 4: 峰值达到 ${params.trailingStop.level4.trigger}% 时，回落至 ${params.trailingStop.level4.stopAt}% 平仓`);
     
     logger.info(`\n🛡️ 代码级自动止损监控（每10秒检查）:`);
     logger.info(`  • ${levMin}-${lowThreshold}倍杠杆，亏损 ${params.stopLoss.low}% 时止损`);
