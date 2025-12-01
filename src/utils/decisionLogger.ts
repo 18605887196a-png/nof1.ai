@@ -48,11 +48,6 @@ export function logDecisionConclusion(
     // 生成日志内容
     let logContent = `=== ${timestamp} - ${type} - ${symbol} ===\n`;
     
-    // 添加额外信息
-    if (additionalInfo && Object.keys(additionalInfo).length > 0) {
-      logContent += `额外信息: ${JSON.stringify(additionalInfo, null, 2)}\n`;
-    }
-    
     // 添加决策内容
     logContent += `结论:\n${decisionText}\n`;
     
