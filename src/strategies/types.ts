@@ -116,6 +116,8 @@ export interface StrategyParams {
     level2: { trigger: number; stopAt: number };
     /** 第三级：盈利达到trigger%时，止损线移至stopAt% */
     level3: { trigger: number; stopAt: number };
+    /** 第四级：盈利达到trigger%时，止损线移至stopAt% */
+    level4?: { trigger: number; stopAt: number };
   };
   
   /** 分批止盈配置，逐步锁定利润（由AI主动执行） */

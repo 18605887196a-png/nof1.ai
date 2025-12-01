@@ -85,60 +85,48 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
        stopLoss: {
             mode: "dynamic" as "static" | "dynamic",
 
-            // 静态止损（不变）
-            low: -1.8,
-            mid: -1.2,
-            high: -0.8,
-
             calculate: (
                 symbolVolatility: number,
                 leverage: number,
                 structureStrength: "strong" | "normal" | "weak",
                 microRhythm: "favorable" | "neutral" | "unfavorable"
             ): number => {
+                let base = -0.40;
 
-                // 1) 初始止损
-                let base = -0.5;
+                if (leverage >= 12) base += 0.12;
+                else if (leverage >= 7) base += 0.06;
 
-                // 2) 杠杆影响
-                if (leverage >= 15) base += 0.20;
-                else if (leverage >= 8) base += 0.10;
-                else if (leverage <= 6) base -= 0.35;
+                if (symbolVolatility > 2.4) base -= 0.07;
+                else if (symbolVolatility > 1.8) base -= 0.04;
+                else if (symbolVolatility >= 1.2) base += 0.00;
+                else if (symbolVolatility < 0.9) base += 0.06;
 
-                // 3) 波动率影响
-                if (symbolVolatility > 2.0) base -= 0.15;
-                else if (symbolVolatility < 1.0) base += 0.10;
+                if (structureStrength === "strong") base += 0.12;
+                if (structureStrength === "weak") base -= 0.08;
 
-                // 4) 结构强弱影响
-                if (structureStrength === "strong") base += 0.10;
-                if (structureStrength === "weak")   base -= 0.15;
+                if (microRhythm === "favorable") base += 0.08;
+                if (microRhythm === "unfavorable") base += 0.05;
 
-                // 5) 微节奏动态权重（核心修复）
-                // favorable → 止损更紧
-                // neutral   → 不变
-                // unfavorable → 止损更宽（但不突破下限）
-                if (microRhythm === "favorable")   base += 0.06;
-                if (microRhythm === "unfavorable") base -= 0.10;
-
-                // 6) 强制范围
-                if (base > -0.55) base = -0.55; // 上限（最紧）
-                if (base < -0.95) base = -0.95; // 下限（最宽）
+                if (base > -0.28) base = -0.28;
+                if (base < -0.60) base = -0.60;
 
                 return Number(base.toFixed(2));
             }
         },
-       // ==================== 移动止盈配置 ====================
-      trailingStop: {
-        level1: { trigger: 0.9, stopAt: 0.55 }, 
-        level2: { trigger: 1.3, stopAt: 0.8 }, 
-        level3: { trigger: 2.0, stopAt: 1.4 }
-      },
-// ==================== 分批止盈配置（日内波段优化）====================
-      partialTakeProfit: {
-          stage1: { trigger: 0.8, closePercent: 40 },
-          stage2: { trigger: 1.2, closePercent: 40 },
-          stage3: { trigger: 1.8, closePercent: 100 }
-      },
+        // 分批止盈调整（提高触发点，减少过早收割）
+       partialTakeProfit: {
+           stage1: { trigger: 1.0, closePercent: 30 },
+           stage2: { trigger: 1.6, closePercent: 30 },
+           stage3: { trigger: 2.2, closePercent: 0 }   // 保留尾仓
+       },
+
+        // 移动止盈同步调整（四挡配置）
+       trailingStop: {
+           level1: { trigger: 1.0, stopAt: 0.5 },
+           level2: { trigger: 1.8, stopAt: 1.0 },
+           level3: { trigger: 2.6, stopAt: 1.6 },
+           level4: { trigger: 3.5, stopAt: 2.3 }
+       },
 
       // ==================== 峰值回撤保护 ====================
       peakDrawdownProtection: 2,

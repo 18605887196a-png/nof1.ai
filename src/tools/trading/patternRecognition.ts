@@ -1596,6 +1596,7 @@ export function extractModeFromAnalysis(analysis: string): string {
     return analysis.slice(0, 100);
 }
 
+
 export const patternAnalysisHFVisualTool = tool({
     name: "patternAnalysisHFVisual",
     description: "基于 Coinglass 高频两周期（5m/1m），自动捕获图表并进行高频微结构识别（Support/Resistance、HL/LH、CVD/OI 微趋势）。适用于 HF-MicroTrader 高频/中频策略。",
@@ -1623,8 +1624,8 @@ export const patternAnalysisHFVisualTool = tool({
                 fastChartBase64,
                 microChartBase64
             ] = await Promise.all([
-                captureCoingleassChart(symbol, fastTimeframe),  // 5m
-                captureCoingleassChart(symbol, microTimeframe)  // 1m
+                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1500),  // 5m
+                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1500)  // 1m
             ]);
 
             // ====================================================================
@@ -1703,6 +1704,8 @@ export const patternAnalysisHFVisualTool = tool({
     }
 });
 
+// HF 视觉引擎（runHFVisualAgent）
+// HF 视觉引擎（v4.1）
 export async function runHFVisualAgent(
     chart5mBase64: string,
     chart1mBase64: string,
@@ -1713,6 +1716,8 @@ export async function runHFVisualAgent(
         const apiKey = process.env.VISION_API_KEY || process.env.OPENAI_API_KEY;
         const baseUrl = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
         const model = process.env.VISION_MODEL_NAME || "qwen3-vl-plus";
+
+        enableThinking=true;
 
         if (!chart5mBase64 || !chart1mBase64) {
             throw new Error("缺少图像数据（5m/1m）。");
@@ -1727,33 +1732,48 @@ export async function runHFVisualAgent(
                 {
                     role: "system",
                     content: `
-你是一个 5m + 1m 微结构视觉分析器（HF‑MicroTrend Visual Engine）。
-任务：从两张 Coinglass 图表（5m / 1m）中识别短线结构，用于日内 / 高频微结构交易。
-禁止预测未来，只能进行结构识别。
+你是一名视觉微结构分析器（Visual Micro‑Structure Engine）。
+任务：基于 5m / 1m Coinglass 图识别可见结构，不得预测未来。
 
 ========================================================
 【必须识别结构】
-1. 微结构点：HL / LH、小趋势、小箱体  
+1. HL / LH、小趋势、小箱体  
 2. LVN / HVN / 微 POC  
-3. Micro Support / Micro Resistance（必须是明确区间，如 "90500 - 90800"）  
-4. Spot CVD / Futures CVD 微趋势（上拐 / 下拐 / 横盘）  
-5. OI 微趋势（上升 / 下降 / 横盘）  
+3. Micro Support / Micro Resistance（必须输出明确区间：“xxxx - xxxx”）  
+4. Spot CVD / Futures CVD （上拐 / 下拐 / 横盘）  
+5. OI （上升 / 下降 / 横盘）  
 6. Volume（放大 / 正常 / 低迷）  
-7. 微节奏（有利 / 中性 / 轻微不利 / 明显不利）  
-8. 小假突破 / 小假跌破（fake breakout / fake breakdown）  
+7. 5m / 1m 微节奏（有利 / 中性 / 轻微不利 / 明显不利）  
+8. 假突破 / 假跌破（fake breakout / fake breakdown）
+
+========================================================
+【新增必须识别字段】
+市场状态（根据结构判断）：
+- trend  
+- range  
+- breakout_attempt  
+
+动量衰竭：
+- bull  
+- bear  
+- none  
+
+流动性风险：
+- high  
+- medium  
+- low  
 
 ========================================================
 【禁止】
-- 禁止含糊描述，例如「一带 / 附近 / 区域」  
 - 禁止预测未来  
-- 禁止交易建议  
-- 禁止使用图外数据  
+- 禁止使用图外信息  
+- 禁止模糊表述：如“附近”“一带”“差不多”  
 
 ========================================================
 【输出格式】
 
 【微结构判定】  
-（描述箱体、小趋势、假突破、LVN/HVN 等）
+描述箱体、小趋势、假突破、LVN/HVN
 
 【关键区间】  
 Micro Support：xxxx - xxxx  
@@ -1771,6 +1791,15 @@ OI：上升/下降/横盘
 【5m/1m 微节奏】  
 有利 / 中性 / 轻微不利 / 明显不利  
 
+【市场状态】  
+trend / range / breakout_attempt
+
+【动量衰竭】  
+bull / bear / none
+
+【流动性风险】  
+high / medium / low
+
 【可交易性】  
 可交易（多） / 可交易（空） / 禁止交易（噪音/POC）
 `
@@ -1778,7 +1807,7 @@ OI：上升/下降/横盘
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: `请对 ${symbol} 的 5m / 1m 图进行高频结构识别：` },
+                        { type: "text", text: `请对 ${symbol} 的 5m / 1m 图进行结构分析：` },
                         { type: "image_url", image_url: { url: `data:image/png;base64,${chart5mBase64}`, detail: "high" }},
                         { type: "image_url", image_url: { url: `data:image/png;base64,${chart1mBase64}`, detail: "high" }},
                     ]
@@ -1788,8 +1817,7 @@ OI：上升/下降/横盘
             enable_thinking: enableThinking
         });
 
-        const result = response.choices[0]?.message?.content ?? "";
-        return result.trim();
+        return (response.choices[0]?.message?.content ?? "").trim();
 
     } catch (err) {
         console.error(`[${symbol}] HF视觉分析失败:`, err);
@@ -1800,7 +1828,10 @@ Micro Support：无
 Micro Resistance：无  
 【HL/LH】无  
 【CVD/OI】无  
-【微节奏】中性  
+【5m/1m 微节奏】中性  
+【市场状态】range  
+【动量衰竭】none  
+【流动性风险】medium  
 【可交易性】禁止交易`;
     }
 }

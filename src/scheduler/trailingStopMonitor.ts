@@ -94,11 +94,12 @@ function checkTrailingStop(peakPnlPercent: number, currentPnlPercent: number): {
     throw new Error("移动止盈配置不存在");
   }
   
-  const { level1, level2, level3 } = params.trailingStop;
+  const { level1, level2, level3,level4} = params.trailingStop;
   
   // 按照从高到低的顺序检查（level3 -> level2 -> level1）
   // 盈利达到 trigger% 时，如果当前盈利回落到 stopAt% 或以下，触发平仓
   const levels = [
+    ...(level4 ? [{ name: "level4", trigger: level4.trigger, stopAt: level4.stopAt }] : []),
     { name: "level3", trigger: level3.trigger, stopAt: level3.stopAt },
     { name: "level2", trigger: level2.trigger, stopAt: level2.stopAt },
     { name: "level1", trigger: level1.trigger, stopAt: level1.stopAt },

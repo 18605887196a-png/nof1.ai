@@ -60,131 +60,72 @@ const dbClient = createClient({
 // ============================================================
 // 动态止损计算函数（集成）
 // ============================================================
+function calculateVolatility(symbol, marketData) {
+    try {
+        if (!marketData || !marketData[symbol]) return 1.5;
 
-/**
- * 计算币种波动率（基于ATR或价格变化率）
- */
-function calculateVolatility(symbol: string, marketData: any): number {
-  try {
-    if (!marketData || !marketData[symbol]) {
-      logger.warn(`${symbol} 市场数据不存在，使用默认波动率 1.5%`);
-      return 1.5;
-    }
+        const data = marketData[symbol];
+        const tf1m = data.timeframes?.["1m"];
+        const tf5m = data.timeframes?.["5m"];
+        const price = data.price;
 
-    const data = marketData[symbol];
-    
-    // 优先使用 ATR14 (更准确的波动率指标)
-    if (data.longerTermContext?.atr14 && data.price) {
-      const atrPercent = (data.longerTermContext.atr14 / data.price) * 100;
-      return Number(atrPercent.toFixed(2));
+        if (!price) return 1.5;
+
+        if (tf1m?.atr14) return Number(((tf1m.atr14 / price) * 100).toFixed(2));
+        if (tf1m?.currentPrice) {
+            return Number(
+                (Math.abs((price - tf1m.currentPrice) / tf1m.currentPrice) * 100).toFixed(2)
+            );
+        }
+        if (tf5m?.atr14) return Number(((tf5m.atr14 / price) * 100).toFixed(2));
+
+        return 1.5;
+    } catch {
+        return 1.5;
     }
-    
-    // 备用：使用最近价格变化率
-    if (data.timeframes?.['5m']?.currentPrice && data.price) {
-      const priceChange = Math.abs((data.price - data.timeframes['5m'].currentPrice) / data.timeframes['5m'].currentPrice) * 100;
-      return Number(priceChange.toFixed(2));
-    }
-    
-    // 默认值
-    return 1.5;
-  } catch (error: any) {
-    logger.error(`计算 ${symbol} 波动率失败: ${error.message}`);
-    return 1.5;
-  }
 }
 
-/**
- * 分析5m结构强度
- */
-function analyzeStructureStrength(
-  symbol: string,
-  marketData: any
-): "strong" | "normal" | "weak" {
-  try {
-    if (!marketData || !marketData[symbol]) {
-      return "normal";
+function analyzeStructureStrength(symbol, marketData) {
+    try {
+        const tf5m = marketData?.[symbol]?.timeframes?.["5m"];
+        if (!tf5m || !tf5m.currentPrice || !tf5m.ema20) return "normal";
+
+        const price = tf5m.currentPrice;
+        const ema = tf5m.ema20;
+        const gap = Math.abs((price - ema) / ema) * 100;
+
+        if (gap < 0.3) return "weak";
+        if (gap > 1.2) return "strong";
+        return "normal";
+    } catch {
+        return "normal";
     }
-
-    const data = marketData[symbol];
-    const tf5m = data.timeframes?.['5m'];
-    
-    if (!tf5m) {
-      return "normal";
-    }
-
-    // 分析 5m 时间框架的趋势强度
-    const price = tf5m.currentPrice;
-    const ema20 = tf5m.ema20;
-    const macd = tf5m.macd;
-    const rsi = tf5m.rsi7;
-
-    // 强趋势条件
-    const priceEmaGap = Math.abs((price - ema20) / ema20) * 100;
-    const strongTrend = priceEmaGap > 2.0 && Math.abs(macd) > 0.5 && rsi > 30 && rsi < 70;
-
-    // 弱趋势条件
-    const weakTrend = priceEmaGap < 0.5 && Math.abs(macd) < 0.2 && rsi > 45 && rsi < 55;
-
-    if (strongTrend) {
-      return "strong";
-    } else if (weakTrend) {
-      return "weak";
-    } else {
-      return "normal";
-    }
-  } catch (error: any) {
-    logger.error(`分析 ${symbol} 结构强度失败: ${error.message}`);
-    return "normal";
-  }
 }
 
-/**
- * 分析1m微节奏状态
- */
-function analyzeMicroRhythm(
-  symbol: string,
-  marketData: any,
-  positionSide: "long" | "short"
-): "favorable" | "neutral" | "unfavorable" {
-  try {
-    if (!marketData || !marketData[symbol]) {
-      return "neutral";
+function analyzeMicroRhythm(symbol, marketData, positionSide) {
+    try {
+        const tf1m = marketData?.[symbol]?.timeframes?.["1m"];
+        if (!tf1m || !tf1m.currentPrice || !tf1m.ema20) return "neutral";
+
+        const price = tf1m.currentPrice;
+        const ema = tf1m.ema20;
+
+        const gap = ((price - ema) / ema) * 100;
+        const impulse = tf1m.impulseDirection || 0;
+
+        if (positionSide === "long") {
+            if (gap > 0.1 && impulse > 0) return "favorable";
+            if (gap < -0.1 && impulse < 0) return "unfavorable";
+        }
+        if (positionSide === "short") {
+            if (gap < -0.1 && impulse < 0) return "favorable";
+            if (gap > 0.1 && impulse > 0) return "unfavorable";
+        }
+        return "neutral";
+    } catch {
+        return "neutral";
     }
-
-    const data = marketData[symbol];
-    const tf1m = data.timeframes?.['1m'];
-    
-    if (!tf1m) {
-      return "neutral";
-    }
-
-    // 分析 1m 时间框架与持仓方向的一致性
-    const price = tf1m.currentPrice;
-    const ema20 = tf1m.ema20;
-    const macd = tf1m.macd;
-
-    // 判断 1m 趋势方向
-    const bullish1m = price > ema20 && macd > 0;
-    const bearish1m = price < ema20 && macd < 0;
-
-    // 有利：1m方向与持仓方向一致
-    if ((positionSide === "long" && bullish1m) || (positionSide === "short" && bearish1m)) {
-      return "favorable";
-    }
-
-    // 不利：1m方向与持仓方向相反
-    if ((positionSide === "long" && bearish1m) || (positionSide === "short" && bullish1m)) {
-      return "unfavorable";
-    }
-
-    // 中性：方向不明确
-    return "neutral";
-  } catch (error: any) {
-    logger.error(`分析 ${symbol} 微节奏失败: ${error.message}`);
-    return "neutral";
-  }
 }
-
 /**
  * 计算动态止损百分比
  */
