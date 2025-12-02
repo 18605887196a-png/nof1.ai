@@ -127,20 +127,37 @@ function analyzeMicroRhythm(symbol, marketData, positionSide) {
     }
 }
 
-function analyzeMarketState(symbol: string, marketData: any): "trend" | "range" | "breakout_attempt" {
+function analyzeMarketState(symbol: string, marketData: any): "trend" | "trend_with_pullback" | "range" | "breakout_attempt" {
     try {
         const tf5m = marketData?.[symbol]?.timeframes?.["5m"];
         const tf1m = marketData?.[symbol]?.timeframes?.["1m"];
 
-        if (!tf5m || !tf1m) return "range"; // 默认
+        if (!tf5m || !tf1m) return "range";
 
-        // 简单判断：价格离EMA20的距离
-        const price = tf5m.currentPrice;
-        const ema20 = tf5m.ema20;
-        const gap = Math.abs((price - ema20) / ema20) * 100;
+        const price5m = tf5m.currentPrice;
+        const ema20_5m = tf5m.ema20;
+        const gap5m = Math.abs((price5m - ema20_5m) / ema20_5m) * 100;
 
-        if (gap > 0.5) return "trend";
-        if (gap < 0.2) return "range";
+        // 1. 判断趋势
+        if (gap5m > 0.8) return "trend";
+        
+        // 2. 判断趋势回调：5分钟图有趋势特征，但1分钟图显示回调
+        if (gap5m > 0.3 && gap5m <= 0.8) {
+            const price1m = tf1m.currentPrice;
+            const ema20_1m = tf1m.ema20;
+            const gap1m = Math.abs((price1m - ema20_1m) / ema20_1m) * 100;
+            
+            // 如果1分钟图价格更接近EMA20，说明在回调
+            if (gap1m < 0.3) {
+                return "trend_with_pullback";
+            }
+            return "trend";
+        }
+        
+        // 3. 判断区间震荡
+        if (gap5m < 0.15) return "range";
+        
+        // 4. 突破尝试
         return "breakout_attempt";
 
     } catch {

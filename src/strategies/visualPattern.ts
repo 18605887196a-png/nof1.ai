@@ -81,85 +81,58 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
            strong: "25-28%",
        },
        
-       // ==================== 止损配置 ====================
-       // ==================== 止损配置（优化版）====================
+       // ==================== 优化后的配置 ====================
         stopLoss: {
             mode: "dynamic",
-            
             calculate: (
                 symbolVolatility: number,
                 leverage: number,
                 structureStrength: "strong" | "normal" | "weak",
                 microRhythm: "favorable" | "neutral" | "unfavorable",
-                marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt"
-            ): number => {
-                  // 基础止损
-                let base = -0.7;
-                
-                // 1. 市场状态（最重要）
-                if (marketState === "trend") base = -1.0;
-                if (marketState === "range") base = -0.5;
-                if (marketState === "trend_with_pullback") base = -0.8;
-                if (marketState === "breakout_attempt") base = -0.4;
-                
-                // 2. 结构强度（覆盖市场状态）
-                if (structureStrength === "strong") {
-                    // 强结构：自信，收紧止损
-                    if (base < -0.5) base = -0.5;  // 收紧到-0.5%以内
-                } else if (structureStrength === "weak") {
-                    // 弱结构：不自信，放宽止损
-                    if (base > -1.0) base = -1.0;  // 放宽到-1.0%以外
+                marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt",
+                positionSide: "long" | "short"
+            ) => {
+                switch(marketState) {
+                    case "trend": return -1.2;          // 价格反向0.2%
+                    case "trend_with_pullback": return -1.0;  // 价格反向0.1667%
+                    case "range": return -0.6;          // 价格反向0.1%
+                    case "breakout_attempt": return -0.5;     // 价格反向0.0833%
+                    default: return -0.8;
                 }
-                
-                // 3. 微节奏（微调）
-                if (microRhythm === "favorable") {
-                    base += 0.1;  // 收紧
-                } else if (microRhythm === "unfavorable") {
-                    base -= 0.15; // 放宽
-                }
-                
-                // 边界限制
-                if (base > -0.3) base = -0.3;
-                if (base < -1.5) base = -1.5;
-                
-                return Number(base.toFixed(2));
             }
         },
 
-        // ==================== 止盈配置（保持原样）====================
         partialTakeProfit: {
-            // 利用手续费优势，快速锁定
             stage1: {
-                trigger: 0.25,
+                trigger: 0.4,      // 保证金盈利0.4%（价格波动0.0667%）
                 closePercent: 60
             },
             stage2: {
-                trigger: 0.6,
+                trigger: 0.8,      // 保证金盈利0.8%（价格波动0.1333%）
                 closePercent: 30
             },
             stage3: {
-                trigger: 1.2,
+                trigger: 1.5,      // 保证金盈利1.5%（价格波动0.25%）
                 closePercent: 0
             }
         },
 
-        // ==================== 移动止盈（微调）====================
         trailingStop: {
             level1: {
-                trigger: 0.25,
-                stopAt: 0.1   // 从0.08提高到0.1%
+                trigger: 0.4,      // 同步
+                stopAt: 0.2        // 确保0.2%利润
             },
             level2: {
-                trigger: 0.5,
-                stopAt: 0.35  // 从0.3提高到0.35%
+                trigger: 0.8,
+                stopAt: 0.6
             },
             level3: {
-                trigger: 0.9,
-                stopAt: 0.7   // 从0.6提高到0.7%
+                trigger: 1.2,
+                stopAt: 0.9
             },
             level4: {
-                trigger: 1.5,
-                stopAt: 1.2   // 从1.0提高到1.2%
+                trigger: 1.8,
+                stopAt: 1.4
             }
         },
 
