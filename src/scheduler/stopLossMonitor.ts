@@ -126,58 +126,82 @@ function analyzeMicroRhythm(symbol, marketData, positionSide) {
         return "neutral";
     }
 }
+
+function analyzeMarketState(symbol: string, marketData: any): "trend" | "range" | "breakout_attempt" {
+    try {
+        const tf5m = marketData?.[symbol]?.timeframes?.["5m"];
+        const tf1m = marketData?.[symbol]?.timeframes?.["1m"];
+
+        if (!tf5m || !tf1m) return "range"; // 默认
+
+        // 简单判断：价格离EMA20的距离
+        const price = tf5m.currentPrice;
+        const ema20 = tf5m.ema20;
+        const gap = Math.abs((price - ema20) / ema20) * 100;
+
+        if (gap > 0.5) return "trend";
+        if (gap < 0.2) return "range";
+        return "breakout_attempt";
+
+    } catch {
+        return "range";
+    }
+}
+
 /**
  * 计算动态止损百分比
  */
 function calculateDynamicStopLoss(
-  symbol: string,
-  leverage: number,
-  marketData: any,
-  positionSide: "long" | "short"
+    symbol: string,
+    leverage: number,
+    marketData: any,
+    positionSide: "long" | "short"
 ): number {
-  const strategy = getTradingStrategy();
-  const params = getStrategyParams(strategy);
+    const strategy = getTradingStrategy();
+    const params = getStrategyParams(strategy);
 
-  // 检查策略是否支持动态止损
-  if (!params.stopLoss || typeof params.stopLoss.calculate !== 'function') {
-    logger.debug(`策略 [${params.name}] 不支持动态止损，使用静态配置`);
-    
-    // 使用静态配置（根据杠杆映射）
-    const levMin = params.leverageMin;
-    const levMax = params.leverageMax;
-    const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
-    const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
-    
-    if (leverage > midThreshold) {
-      return params.stopLoss.high;
-    } else if (leverage > lowThreshold) {
-      return params.stopLoss.mid;
-    } else {
-      return params.stopLoss.low;
+    // 检查策略是否支持动态止损
+    if (!params.stopLoss || typeof params.stopLoss.calculate !== 'function') {
+        logger.debug(`策略 [${params.name}] 不支持动态止损，使用静态配置`);
+
+        // 使用静态配置（根据杠杆映射）
+        const levMin = params.leverageMin;
+        const levMax = params.leverageMax;
+        const lowThreshold = Math.ceil(levMin + (levMax - levMin) * 0.33);
+        const midThreshold = Math.ceil(levMin + (levMax - levMin) * 0.67);
+
+        if (leverage > midThreshold) {
+            return params.stopLoss.high;
+        } else if (leverage > lowThreshold) {
+            return params.stopLoss.mid;
+        } else {
+            return params.stopLoss.low;
+        }
     }
-  }
 
-  // 计算市场指标
-  const volatility = calculateVolatility(symbol, marketData);
-  const structureStrength = analyzeStructureStrength(symbol, marketData);
-  const microRhythm = analyzeMicroRhythm(symbol, marketData, positionSide);
+    // 计算市场指标
+    const volatility = calculateVolatility(symbol, marketData);
+    const structureStrength = analyzeStructureStrength(symbol, marketData);
+    const microRhythm = analyzeMicroRhythm(symbol, marketData, positionSide);
+    const marketState = analyzeMarketState(symbol, marketData);
 
-  // 调用策略的动态计算函数
-  const dynamicStopLoss = params.stopLoss.calculate(
-    volatility,
-    leverage,
-    structureStrength,
-    microRhythm
-  );
+    // 调用策略的动态计算函数
+    const dynamicStopLoss = params.stopLoss.calculate(
+        volatility,
+        leverage,
+        structureStrength,
+        microRhythm,
+        marketState
+    );
 
-  logger.info(`${symbol} 动态止损计算:`);
-  logger.info(`  杠杆: ${leverage}x`);
-  logger.info(`  波动率: ${volatility.toFixed(2)}%`);
-  logger.info(`  结构强度: ${structureStrength}`);
-  logger.info(`  微节奏: ${microRhythm}`);
-  logger.info(`  动态止损: ${dynamicStopLoss.toFixed(2)}%`);
+    logger.info(`${symbol} 动态止损计算:`);
+    logger.info(`  杠杆: ${leverage}x`);
+    logger.info(`  波动率: ${volatility.toFixed(2)}%`);
+    logger.info(`  结构强度: ${structureStrength}`);
+    logger.info(`  微节奏: ${microRhythm}`);
+    logger.info(`  动态止损: ${dynamicStopLoss.toFixed(2)}%`);
 
-  return dynamicStopLoss;
+    return dynamicStopLoss;
 }
 
 /**

@@ -674,9 +674,25 @@ export async function captureCoingleassChart(
             filepath = path.join(screenshotDir!, filename);
         }
 
-
         logger.info('开始截图...');
         const t9 = Date.now();
+
+        try {
+            // 先按 ESC 清理可能的工具/光标
+            await page.keyboard.press('Escape');
+            await page.waitForTimeout(100);
+
+            // 再把鼠标移出图表区域
+            const viewport = page.viewportSize();
+            if (viewport) {
+                const targetX = Math.min(50, viewport.width - 10);
+                const targetY = Math.min(50, viewport.height - 10);
+                await page.mouse.move(targetX, targetY, { steps: 10 });
+                await page.waitForTimeout(200);
+            }
+        } catch (e) {
+            logger.warn(`截图前清理十字光标失败: ${e}`);
+        }
 
 
 // 截取整个页面的截图

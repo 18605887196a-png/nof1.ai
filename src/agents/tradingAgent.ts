@@ -2151,96 +2151,64 @@ export function generateTradingPrompt(data: {
 
         const currentTime = formatChinaTime();
 
-        // 格式化资金费率
-        let fundingRates: { [symbol: string]: number } = {};
-        if (marketData) {
-            for (const [symbol, symbolData] of Object.entries(marketData)) {
-                const d = symbolData as any;
-                if (d?.fundingRate !== undefined) {
-                    fundingRates[symbol] = d.fundingRate * 100;
-                }
-            }
-        }
-
-        // ========= 构造实时价格列表 =========
-        let priceSection = "";
-        if (marketData) {
-            for (const [symbol, raw] of Object.entries(marketData)) {
-                const md = raw as any;
-                if (md && typeof md.price === "number") {
-                    priceSection += `\n- ${symbol}（当前参考价约 ${md.price.toFixed(2)}）`;
-                } else {
-                    priceSection += `\n- ${symbol}（当前参考价未知，需通过工具查询）`;
-                }
-            }
-        } else {
-            priceSection = "\n(无市场价格数据，请 Trader 调用工具获取)";
-        }
-
         const prompt = `
-# HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
-执行频率：${intervalMinutes} 分钟
-结构驱动：5m 主结构 + 1m 微节奏（视觉工具将在本周期由 Trader 自动调用）
+            # HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
 
-============================================================
-【实时市场价格】
-${priceSection}
+            ============================================================
+            【账户状态】
+            总资产：${accountInfo.totalBalance.toFixed(2)} U
+            可用余额：${accountInfo.availableBalance.toFixed(2)} U
 
-============================================================
-【账户】
-总资产：${accountInfo.totalBalance.toFixed(2)}
-可用余额：${accountInfo.availableBalance.toFixed(2)}
-建议单笔风险：账户的 10%～25% 作为开仓金额
-
-============================================================
-【当前持仓】
-${
-            positions?.length
+            ============================================================
+            【当前持仓】
+            ${positions?.length 
                 ? positions.map(p => {
                     const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 *
-                        (p.side === "long" ? 1 : -1) * p.leverage;
-                    return `- ${p.symbol} ${p.side} | 浮盈亏 ${pnl.toFixed(2)}%`;
+                                (p.side === "long" ? 1 : -1) * p.leverage;
+                    return `${p.symbol} ${p.side} ${p.percentage || 10}% | 浮盈${pnl.toFixed(2)}%`;
                 }).join("\n")
                 : "无持仓"
-        }
-        
-============================================================
-【系统提示】
-当前持仓可能已经被系统自动处理（如部分止盈、移动止盈或保护性平仓）。请按剩余仓位继续进行结构化持仓管理，无需重建方向。
+            }
 
-============================================================
-【资金费率（FR）】
-${
-            Object.keys(fundingRates).length
-                ? Object.entries(fundingRates)
-                    .map(([s, r]) => `${s}: ${r.toFixed(6)}%`)
-                    .join("，")
-                : "无数据"
-        }
-说明：当 |FR| > 0.03% 时应避免开仓（拥挤流动性方向）
+            ============================================================
+            【系统自动处理】
+            系统有秒级的自动监控系统，满足条件时会执行：
+            ✓ 止损/止盈条件触发 → 自动平仓
+            ✓ 移动止盈触发 → 自动调整止盈
+            ✓ 风险控制 → 自动调整仓位
 
-============================================================
-【上个周期 Trader 决策】
-${recentDecisions?.length ? recentDecisions[0].decision : "无记录"}
+            当前持仓已反映最新状态。
 
-============================================================
-提示（重要）：
-- Trader 将在本周期内部主动调用 5m+1m 视觉工具获取最新结构  
-- 本提示仅提供账户、仓位、市场价格与历史决策  
-- Trader 需基于视觉结构输出唯一交易结论，并根据 instructions 调用工具开仓/平仓
+            ============================================================
+            【决策流程】
+            1. 调用视觉分析工具（patternAnalysisHFVisualTool）
+            2. 基于视觉分析结果决策
+            3. 需要时调用开仓/平仓工具
 
-============================================================
-请严格按照视觉分析结构生成本周期唯一交易决策。
-`;
+            ============================================================
+            【重要规则】
+            • 价格判断以视觉工具为准（不要记忆价格）
+            • 只分析视觉工具返回的Micro Support/Resistance
+            • 严格遵守instructions中的入场条件
+            • 关注当日交易统计和风控
 
-        // 记录到决策日志
+            ============================================================
+            现在开始分析。
+            `;
+
+        // 记录实时价格到决策日志
         const { logDecisionConclusion } = require('../utils/decisionLogger');
-        logDecisionConclusion('发送给agent的交易prompt', marketData.symbol || 'BTC', prompt, {
-            type: 'visual-pattern-prompt',
-            iteration,
-            intervalMinutes,
-            timestamp: new Date().toISOString()
-        });
+        if (marketData) {
+            const priceInfo = Object.entries(marketData)
+                .map(([symbol, data]: [string, any]) => `${symbol}: ${data.price?.toFixed(2) || 'N/A'}`)
+                .join(' | ');
+            logDecisionConclusion('HF-Trader执行周期价格', 'MULTI', priceInfo, {
+                type: 'market-price',
+                iteration,
+                intervalMinutes,
+                timestamp: new Date().toISOString()
+            });
+        }
 
         return prompt;
 }

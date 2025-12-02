@@ -1624,8 +1624,8 @@ export const patternAnalysisHFVisualTool = tool({
                 fastChartBase64,
                 microChartBase64
             ] = await Promise.all([
-                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1200),  // 5m
-                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1200)  // 1m
+                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1250),  // 5m
+                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1000)  // 1m
             ]);
 
             // ====================================================================
@@ -1646,10 +1646,10 @@ export const patternAnalysisHFVisualTool = tool({
             // ====================================================================
             // ④ 记录视觉决策
             // ====================================================================
-            logDecisionConclusion("视觉（高频 5m+1m）决策结论", symbol, analysis, {
-                fastTimeframe,
-                microTimeframe
-            });
+            // logDecisionConclusion("视觉（高频 5m+1m）决策结论", symbol, analysis, {
+            //     fastTimeframe,
+            //     microTimeframe
+            // });
 
             // ====================================================================
             // ⑤ 发送 Telegram 通知（与主策略一致）
@@ -1732,77 +1732,87 @@ export async function runHFVisualAgent(
                 {
                     role: "system",
                     content: `
-你是一名视觉微结构分析器（Visual Micro‑Structure Engine）。
-任务：基于 5m / 1m Coinglass 图识别可见结构，不得预测未来。
+                你是一名视觉微结构分析器（Visual Micro‑Structure Engine）。
+                任务：基于 5m / 1m Coinglass 图识别可见结构，不得预测未来。
 
-========================================================
-【必须识别结构】
-1. HL / LH、小趋势、小箱体  
-2. LVN / HVN / 微 POC  
-3. Micro Support / Micro Resistance（必须输出明确区间：“xxxx - xxxx”）  
-4. Spot CVD / Futures CVD （上拐 / 下拐 / 横盘）  
-5. OI （上升 / 下降 / 横盘）  
-6. Volume（放大 / 正常 / 低迷）  
-7. 5m / 1m 微节奏（有利 / 中性 / 轻微不利 / 明显不利）  
-8. 假突破 / 假跌破（fake breakout / fake breakdown）
+                ========================================================
+                【极其重要：正确处理左上角 OHLC（四个数字）】
+                每张图左上角会显示（开 / 高 / 低 / 收）OHLC四个数字。
+                这些数字只是当前最新K线的标签（Last Bar Label），禁止用于任何结构判断。
+                正确做法：忽略这些数字，只分析图表中的实际价格走势和成交量分布。
 
-========================================================
-【新增必须识别字段】
-市场状态（根据结构判断）：
-- trend  
-- range  
-- breakout_attempt  
+                ========================================================
+                【必须识别结构】
+                基于实际K线实体和影线识别：
+                1. HL / LH、小趋势、小箱体  
+                2. LVN / HVN / 微 POC（基于成交量分布）
+                3. Micro Support / Micro Resistance（必须输出明确区间："xxxx - xxxx"）
+                4. Spot CVD / Futures CVD（上拐 / 下拐 / 横盘）  
+                5. OI（上升 / 下降 / 横盘）  
+                6. Volume（放大 / 正常 / 低迷）  
+                7. 5m / 1m 微节奏（有利 / 中性 / 轻微不利 / 明显不利）  
+                8. 假突破 / 假跌破（fake breakout / fake breakdown）
 
-动量衰竭：
-- bull  
-- bear  
-- none  
+                ========================================================
+                【必须识别字段】
+                市场状态（根据结构判断）：
+                - trend（有明确连续HL或LH结构）
+                - range（价格在箱体内震荡）
+                - breakout_attempt（正在测试支撑阻力）
+                - trend_with_pullback（趋势但有回调）
 
-流动性风险：
-- high  
-- medium  
-- low  
+                动量衰竭：
+                - bull（价格上涨但CVD/Volume背离）
+                - bear（价格下跌但CVD/Volume背离）
+                - none（无背离）
 
-========================================================
-【禁止】
-- 禁止预测未来  
-- 禁止使用图外信息  
-- 禁止模糊表述：如“附近”“一带”“差不多”  
+                流动性风险：
+                - high（成交量极低或波动极大）
+                - medium
+                - low
 
-========================================================
-【输出格式】
+                ========================================================
+                【禁止】
+                - 禁止预测未来  
+                - 禁止使用图外信息  
+                - 禁止模糊表述：如"附近""一带""差不多"  
+                - 禁止使用左上角OHLC数字进行任何结构判断
 
-【微结构判定】  
-描述箱体、小趋势、假突破、LVN/HVN
+                ========================================================
+                【输出格式】
 
-【关键区间】  
-Micro Support：xxxx - xxxx  
-Micro Resistance：xxxx - xxxx  
+                【微结构判定】  
+                描述箱体、小趋势、假突破、LVN/HVN
 
-【HL/LH 结构】  
-HL：有/无  
-LH：有/无  
+                【关键区间】  
+                Micro Support：xxxx - xxxx  
+                Micro Resistance：xxxx - xxxx  
 
-【CVD / OI】  
-Spot CVD：上拐/下拐/横盘  
-Futures CVD：上拐/下拐/横盘  
-OI：上升/下降/横盘  
+                【HL/LH 结构】  
+                HL：有/无  
+                LH：有/无  
 
-【5m/1m 微节奏】  
-有利 / 中性 / 轻微不利 / 明显不利  
+                【CVD / OI / Volume】  
+                Spot CVD：上拐/下拐/横盘  
+                Futures CVD：上拐/下拐/横盘  
+                OI：上升/下降/横盘  
+                Volume：放大/正常/低迷
 
-【市场状态】  
-trend / range / breakout_attempt
+                【5m/1m 微节奏】  
+                5m：有利/中性/轻微不利/明显不利  
+                1m：有利/中性/轻微不利/明显不利  
 
-【动量衰竭】  
-bull / bear / none
+                【市场状态】  
+                trend / range / breakout_attempt / trend_with_pullback
 
-【流动性风险】  
-high / medium / low
+                【动量衰竭】  
+                bull / bear / none
 
-【可交易性】  
-可交易（多） / 可交易（空） / 禁止交易（噪音/POC）
-`
+                【流动性风险】  
+                high / medium / low
+
+                【可交易性】  
+                可交易（多） / 可交易（空） / 禁止交易（噪音/POC）`
                 },
                 {
                     role: "user",

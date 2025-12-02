@@ -82,51 +82,86 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
        },
        
        // ==================== 止损配置 ====================
-       stopLoss: {
-            mode: "dynamic" as "static" | "dynamic",
-
+       // ==================== 止损配置（优化版）====================
+        stopLoss: {
+            mode: "dynamic",
+            
             calculate: (
                 symbolVolatility: number,
                 leverage: number,
                 structureStrength: "strong" | "normal" | "weak",
-                microRhythm: "favorable" | "neutral" | "unfavorable"
+                microRhythm: "favorable" | "neutral" | "unfavorable",
+                marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt"
             ): number => {
-                let base = -0.40;
-
-                if (leverage >= 12) base += 0.12;
-                else if (leverage >= 7) base += 0.06;
-
-                if (symbolVolatility > 2.4) base -= 0.07;
-                else if (symbolVolatility > 1.8) base -= 0.04;
-                else if (symbolVolatility >= 1.2) base += 0.00;
-                else if (symbolVolatility < 0.9) base += 0.06;
-
-                if (structureStrength === "strong") base += 0.12;
-                if (structureStrength === "weak") base -= 0.08;
-
-                if (microRhythm === "favorable") base += 0.08;
-                if (microRhythm === "unfavorable") base += 0.05;
-
-                if (base > -0.28) base = -0.28;
-                if (base < -0.60) base = -0.60;
-
+                  // 基础止损
+                let base = -0.7;
+                
+                // 1. 市场状态（最重要）
+                if (marketState === "trend") base = -1.0;
+                if (marketState === "range") base = -0.5;
+                if (marketState === "trend_with_pullback") base = -0.8;
+                if (marketState === "breakout_attempt") base = -0.4;
+                
+                // 2. 结构强度（覆盖市场状态）
+                if (structureStrength === "strong") {
+                    // 强结构：自信，收紧止损
+                    if (base < -0.5) base = -0.5;  // 收紧到-0.5%以内
+                } else if (structureStrength === "weak") {
+                    // 弱结构：不自信，放宽止损
+                    if (base > -1.0) base = -1.0;  // 放宽到-1.0%以外
+                }
+                
+                // 3. 微节奏（微调）
+                if (microRhythm === "favorable") {
+                    base += 0.1;  // 收紧
+                } else if (microRhythm === "unfavorable") {
+                    base -= 0.15; // 放宽
+                }
+                
+                // 边界限制
+                if (base > -0.3) base = -0.3;
+                if (base < -1.5) base = -1.5;
+                
                 return Number(base.toFixed(2));
             }
         },
-        // 分批止盈调整（提高触发点，减少过早收割）
-       partialTakeProfit: {
-           stage1: { trigger: 1.0, closePercent: 30 },
-           stage2: { trigger: 1.6, closePercent: 30 },
-           stage3: { trigger: 2.2, closePercent: 0 }   // 保留尾仓
-       },
 
-        // 移动止盈同步调整（四挡配置）
-       trailingStop: {
-           level1: { trigger: 1.0, stopAt: 0.5 },
-           level2: { trigger: 1.8, stopAt: 1.0 },
-           level3: { trigger: 2.6, stopAt: 1.6 },
-           level4: { trigger: 3.5, stopAt: 2.3 }
-       },
+        // ==================== 止盈配置（保持原样）====================
+        partialTakeProfit: {
+            // 利用手续费优势，快速锁定
+            stage1: {
+                trigger: 0.25,
+                closePercent: 60
+            },
+            stage2: {
+                trigger: 0.6,
+                closePercent: 30
+            },
+            stage3: {
+                trigger: 1.2,
+                closePercent: 0
+            }
+        },
+
+        // ==================== 移动止盈（微调）====================
+        trailingStop: {
+            level1: {
+                trigger: 0.25,
+                stopAt: 0.1   // 从0.08提高到0.1%
+            },
+            level2: {
+                trigger: 0.5,
+                stopAt: 0.35  // 从0.3提高到0.35%
+            },
+            level3: {
+                trigger: 0.9,
+                stopAt: 0.7   // 从0.6提高到0.7%
+            },
+            level4: {
+                trigger: 1.5,
+                stopAt: 1.2   // 从1.0提高到1.2%
+            }
+        },
 
       // ==================== 峰值回撤保护 ====================
       peakDrawdownProtection: 2,
