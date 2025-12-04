@@ -92,13 +92,20 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
                 marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt",
                 positionSide: "long" | "short"
             ) => {
-                switch(marketState) {
-                    case "trend": return -1.2;          // 价格反向0.2%
-                    case "trend_with_pullback": return -1.0;  // 价格反向0.1667%
-                    case "range": return -0.6;          // 价格反向0.1%
-                    case "breakout_attempt": return -0.5;     // 价格反向0.0833%
-                    default: return -0.8;
+                // 趋势策略小止损：趋势 0.10%，其他 0.12~0.16%
+                if (marketState === "trend") {
+                    return -0.6;   // 价格回撤约 0.10%
                 }
+                if (marketState === "trend_with_pullback") {
+                    return -0.5;   // 价格回撤约 0.083%
+                }
+                if (marketState === "range") {
+                    return -0.4;   // 价格回撤约 0.066%
+                }
+                if (marketState === "breakout_attempt") {
+                    return -0.4;
+                }
+                return -0.5;
             }
         },
 
