@@ -1624,7 +1624,7 @@ export const patternAnalysisHFVisualTool = tool({
                 fastChartBase64,
                 microChartBase64
             ] = await Promise.all([
-                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1250),  // 5m
+                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1150),  // 5m
                 captureCoingleassChart(symbol, microTimeframe, 'Gate', 1000)  // 1m
             ]);
 
@@ -1731,98 +1731,83 @@ export async function runHFVisualAgent(
                 {
                     role: "system",
                     content: `============================================================
-【防越狱 / 防幻觉规则】
+【视觉安全规则（最高优先级）】
 ============================================================
-● 不预测未来，不使用“可能/将会”等推测性语言。  
-● 不创造图中不存在的结构、趋势、HL/LH、区间、形态。  
-● 某些K线图左上角出现的 OHLC 四个数字只是标签；
-  不得使用 OHLC 判定 HL/LH、支撑/阻力、趋势、高低点或突破。  
-● 结构不明确必须写“无”，不得补全、不得臆测。  
-● 不得使用图外数据，不得用逻辑推理补洞。  
-● 必须严格按格式输出，用“xxxx”占位，不得扩展格式。
+● 不预测未来，不使用推测性语言。  
+● 不得创造图中不存在的趋势、结构、价格区间或 HL/LH。  
+● 某些K线图左上角出现的 OHLC 四个数字只是标签，不得使用 OHLC 判定 HL/LH、支撑/阻力、趋势、高低点或突破。  
+● 只能基于图像中看到的信息进行判断。  
+● 输出格式不得改变，字段不得增删。
 
 ============================================================
-【任务：HF 视觉微结构识别（Micro‑Structure Engine）】
+【价格来源规则】
 ============================================================
-你必须基于 1m / 5m 图像识别：
+你只能从图像中如下来源获取价格信息：
 
-● 趋势方向（Trend State）  
-● HL / LH （trend HL / trend LH / reversal HL / reversal LH）  
-● Micro Support / Micro Resistance  
-● CVD（Spot & Futures）与一致性  
-● 成交量结构（放量/缩量/衰竭/假突破 等）  
-● 微节奏（1m 与 5m）  
-● 动量强弱  
-● 流动性风险  
-● 可交易性（是否满足结构/趋势/成交量基本条件）
-
-不得使用 OHLC。
+✔ VPVR（右侧成交密集区）的价格刻度（唯一价格锚点）  
+✔ K 线在 VPVR 上的相对高度位置  
+✔ 1m/5m 图像中的摆动结构  
 
 ============================================================
-【趋势方向（仅从以下选择）】
+【Micro Support / Resistance 区间推断规则】
 ============================================================
-uptrend  
-downtrend  
-trend_with_pullback  
-range  
-reversal_attempt  
-breakout_attempt  
+你必须根据 VPVR 密集区（蓝/黄柱）、摆动高低点推断价格区间。
+格式：xxxx - xxxx  
+必须真实推断，不得使用占位符。
 
 ============================================================
-【HL/LH 分类（必须按下列定义）】
+【结构点规则（HL/LH）】
 ============================================================
-HL：
-- trend HL：回调缩量、未破前HL、趋势延续背景中形成  
-- reversal HL：强拒绝 + CVD 连续上拐 ≥2 + 衰竭 + 放量  
-
-LH：
-- trend LH：反弹缩量、未破前LH、趋势延续背景中形成  
-- reversal LH：强拒绝 + CVD 连续下拐 ≥2 + 衰竭 + 放量  
-
-输出要求：
-HL：trend HL / reversal HL / 无  
-LH：trend LH / reversal LH / 无  
+HL 区间：根据 VPVR 价格刻度 + K线最低点位置（允许估算 ±几十 USD）  
+LH 区间：根据 VPVR 价格刻度 + K线最高点位置（允许估算 ±几十 USD）  
 
 ============================================================
-【关键区间】
+【趋势强度评分（Trend Strength Score）】
 ============================================================
-Micro Support：xxxx - xxxx  
-Micro Resistance：xxxx - xxxx  
+根据 1m + 5m 图像的综合结构，给出趋势力度评分（1~5）：
+
+评分标准：
+5 = 强趋势（急跌急涨，连续 HH/LL，极强动量，深 CVD 倾斜）  
+4 = 偏强趋势（结构完整，动量良好，回调浅）  
+3 = 中性趋势（动量一般，有来回扫）  
+2 = 弱趋势（趋势不健康、回调深、CVD 不稳）  
+1 = 无趋势（range / chop / 混乱）  
+
+输出格式：Trend Strength：1~5
 
 ============================================================
-【CVD】
+【VPVR 结构强度评分（Structure Strength）】
 ============================================================
-Spot CVD：xxxx  
-Futures CVD：xxxx  
-一致性：YES / NO  
-背离：有 / 无  
+根据 VPVR 蓝/黄柱厚度、深度、密集度判断结构强度：
+
+Strong：厚柱 + 连续密集 → 强支撑/阻力  
+Medium：中等密度 → 一般有效  
+Weak：细碎、小柱 → 弱结构，易被扫  
+
+输出字段：
+Structure Strength（Support）：Weak / Medium / Strong  
+Structure Strength（Resistance）：Weak / Medium / Strong
 
 ============================================================
-【成交量结构】
-============================================================
-从以下选择：
-放量上涨 / 放量下跌 / 缩量反弹 / 缩量回调 / 衰竭  
-假突破量 / chop（混乱）  
-
-============================================================
-【微节奏】
-============================================================
-5m：trend / trend_with_pullback / counter-trend / chop  
-1m：trend / trend_with_pullback / counter-trend / chop  
-
-============================================================
-【最终输出格式】
+【最终输出格式（严格执行）】
 ============================================================
 【趋势方向】
 xxxx
 
+【趋势强度】
+Trend Strength：x
+
 【关键区间】
 Micro Support：xxxx - xxxx
 Micro Resistance：xxxx - xxxx
+Structure Strength（Support）：xxxx
+Structure Strength（Resistance）：xxxx
 
 【结构点】
 HL：xxxx
+HL区间：xxxx - xxxx
 LH：xxxx
+LH区间：xxxx - xxxx
 
 【价格位置关系】
 xxxx
