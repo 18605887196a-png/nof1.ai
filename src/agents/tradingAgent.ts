@@ -2139,78 +2139,84 @@ export function generateTradingPrompt(data: {
      return generateVisualPatternPromptForCycle(data);
  }
 
- function generateVisualPatternPromptForCycle(data: any): string {
-        const {
+function generateVisualPatternPromptForCycle(data: any): string {
+    const {
+        iteration,
+        intervalMinutes,
+        accountInfo,
+        positions,
+        recentDecisions,
+        marketData
+    } = data;
+
+    const currentTime = formatChinaTime();
+
+    const prompt = `
+# HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
+
+============================================================
+【账户状态】
+总资产：${accountInfo.totalBalance.toFixed(2)} U
+可用余额：${accountInfo.availableBalance.toFixed(2)} U
+
+============================================================
+【当前持仓】
+${positions?.length 
+    ? positions.map(p => {
+        const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 *
+                    (p.side === "long" ? 1 : -1) * p.leverage;
+        return `${p.symbol} ${p.side} ${p.percentage || 10}% | 浮盈${pnl.toFixed(2)}%`;
+    }).join("\n")
+    : "无持仓"
+}
+
+============================================================
+【系统自动处理】
+本系统具备独立的秒级风控模块，会自动执行：
+✓ 止损/止盈触发时自动平仓  
+✓ 移动止盈自动上调止盈点  
+✓ 风险控制自动调整仓位  
+
+当前持仓信息已反映最新实盘状态。
+
+============================================================
+【决策流程】
+1. 调用视觉工具 patternAnalysisHFVisualTool  
+2. 调用价格工具 getMarketPriceTool  
+3. 使用 instructions 中的评分体系进行多头/空头双向评分  
+4. 根据总分与阈值决定方向与仓位  
+5. 如需开仓/平仓 → 调用 openPositionTool / closePositionTool
+
+============================================================
+【重要规则】
+• 必须以视觉工具返回的 structured JSON 作为结构分析唯一依据。
+• 当前价格必须来自 getMarketPriceTool。
+• 完整按照 instructions 的“多因子加权评分流程”逐步执行。
+• 不得使用旧版硬性入场条件（例如：±0.3%、RRR≥1.2、必须 trend 才能做等）。
+• 不得记忆上一次结构，不得使用历史价格。
+• 评分需对 Long 和 Short 分别计算，方向取分数更高的一侧。
+• 若触发硬性否决（结构缺失、强 CVD 反向、reversal_attempt、high liquidity risk），必须输出无交易。
+• 最终输出格式必须按 instructions 的模板格式输出。
+
+============================================================
+现在开始分析。
+`;
+
+    // 日志保持原样
+    const { logDecisionConclusion } = require('../utils/decisionLogger');
+    if (marketData) {
+        const priceInfo = Object.entries(marketData)
+            .map(([symbol, data]: [string, any]) => `${symbol}: ${data.price?.toFixed(2) || 'N/A'}`)
+            .join(' | ');
+        logDecisionConclusion('HF-Trader执行周期价格', 'MULTI', priceInfo, {
+            type: 'market-price',
             iteration,
             intervalMinutes,
-            accountInfo,
-            positions,
-            recentDecisions,
-            marketData
-        } = data;
+            timestamp: new Date().toISOString()
+        });
+    }
 
-        const currentTime = formatChinaTime();
-
-        const prompt = `
-            # HF‑MicroTrader 决策周期 #${iteration} | ${currentTime}
-
-            ============================================================
-            【账户状态】
-            总资产：${accountInfo.totalBalance.toFixed(2)} U
-            可用余额：${accountInfo.availableBalance.toFixed(2)} U
-
-            ============================================================
-            【当前持仓】
-            ${positions?.length 
-                ? positions.map(p => {
-                    const pnl = ((p.current_price - p.entry_price) / p.entry_price) * 100 *
-                                (p.side === "long" ? 1 : -1) * p.leverage;
-                    return `${p.symbol} ${p.side} ${p.percentage || 10}% | 浮盈${pnl.toFixed(2)}%`;
-                }).join("\n")
-                : "无持仓"
-            }
-
-            ============================================================
-            【系统自动处理】
-            系统有秒级的自动监控系统，满足条件时会执行：
-            ✓ 止损/止盈条件触发 → 自动平仓
-            ✓ 移动止盈触发 → 自动调整止盈
-            ✓ 风险控制 → 自动调整仓位
-
-            当前持仓已反映最新状态。
-
-            ============================================================
-            【决策流程】
-            1. 调用视觉分析工具（patternAnalysisHFVisualTool）
-            2. 基于视觉分析结果决策
-            3. 需要时调用开仓/平仓工具
-
-            ============================================================
-            【重要规则】
-            • 价格判断以视觉工具为准（不要记忆价格）
-            • 只分析视觉工具返回的Micro Support/Resistance
-            • 严格遵守instructions中的入场条件
-            • 关注当日交易统计和风控
-
-            ============================================================
-            现在开始分析。
-            `;
-
-        // 记录实时价格到决策日志
-        const { logDecisionConclusion } = require('../utils/decisionLogger');
-        if (marketData) {
-            const priceInfo = Object.entries(marketData)
-                .map(([symbol, data]: [string, any]) => `${symbol}: ${data.price?.toFixed(2) || 'N/A'}`)
-                .join(' | ');
-            logDecisionConclusion('HF-Trader执行周期价格', 'MULTI', priceInfo, {
-                type: 'market-price',
-                iteration,
-                intervalMinutes,
-                timestamp: new Date().toISOString()
-            });
-        }
-
-        return prompt;
+    return prompt;
 }
 
     // 生成专业交易原则框架

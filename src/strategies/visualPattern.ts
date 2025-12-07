@@ -80,68 +80,90 @@ export function getVisualPatternStrategy(maxLeverage: number): StrategyParams {
            good: "22-25%",
            strong: "25-28%",
        },
-       
-       // ==================== 优化后的配置 ====================
-        stopLoss: {
-            mode: "dynamic",
-            calculate: (
-                symbolVolatility: number,
-                leverage: number,
-                structureStrength: "strong" | "normal" | "weak",
-                microRhythm: "favorable" | "neutral" | "unfavorable",
-                marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt",
-                positionSide: "long" | "short"
-            ) => {
-                // 趋势策略小止损：趋势 0.10%，其他 0.12~0.16%
-                if (marketState === "trend") {
-                    return -0.6;   // 价格回撤约 0.10%
-                }
-                if (marketState === "trend_with_pullback") {
-                    return -0.5;   // 价格回撤约 0.083%
-                }
-                if (marketState === "range") {
-                    return -0.4;   // 价格回撤约 0.066%
-                }
-                if (marketState === "breakout_attempt") {
-                    return -0.4;
-                }
-                return -0.5;
-            }
-        },
 
-        partialTakeProfit: {
-            stage1: {
-                trigger: 0.4,      // 保证金盈利0.4%（价格波动0.0667%）
-                closePercent: 60
-            },
-            stage2: {
-                trigger: 0.8,      // 保证金盈利0.8%（价格波动0.1333%）
-                closePercent: 30
-            },
-            stage3: {
-                trigger: 1.5,      // 保证金盈利1.5%（价格波动0.25%）
-                closePercent: 0
-            }
-        },
+       // ==================== 7倍杠杆高频优化配置 ====================
+stopLoss: {
+    mode: "dynamic",
+    calculate: (
+        symbolVolatility: number,
+        leverage: number,
+        structureStrength: "strong" | "normal" | "weak",
+        microRhythm: "favorable" | "neutral" | "unfavorable",
+        marketState: "trend" | "range" | "trend_with_pullback" | "breakout_attempt" | "reversal_attempt",
+    ) => {
+        // 7倍杠杆基础止损（保证金亏损百分比）
+        let baseStop = -2.5; // 默认趋势
+        
+        // 根据市场状态调整
+        if (marketState === "trend") {
+            baseStop = -2.8;   // 价格回撤约 0.40%
+        } else if (marketState === "trend_with_pullback") {
+            baseStop = -2.2;   // 价格回撤约 0.31%
+        } else if (marketState === "range") {
+            baseStop = -1.6;   // 价格回撤约 0.23%
+        } else if (marketState === "breakout_attempt") {
+            baseStop = -2.0;   // 价格回撤约 0.29%
+        } else if (marketState === "reversal_attempt") {
+            baseStop = -1.2;   // 价格回撤约 0.17%
+        }
+        
+        // 结构强度调整
+        if (structureStrength === "strong") {
+            baseStop *= 1.25;  // 强结构放宽25%
+        } else if (structureStrength === "weak") {
+            baseStop *= 0.75;  // 弱结构收紧25%
+        }
+        
+        // 微节奏调整
+        if (microRhythm === "favorable") {
+            baseStop *= 1.1;   // 有利微节奏放宽10%
+        } else if (microRhythm === "unfavorable") {
+            baseStop *= 0.9;   // 不利微节奏收紧10%
+        }
+        
+        // 波动率调整（symbolVolatility为1分钟ATR百分比）
+        const volatilityMultiplier = 1.0 + (symbolVolatility - 0.1) * 2; // 基础波动0.1%
+        baseStop *= Math.min(1.5, Math.max(0.7, volatilityMultiplier));
+        
+        // 确保最小止损覆盖成本（手续费0.12% + 滑点0.03% = 0.15%）
+        const minStopForCost = -0.15 * leverage * 1.8; // 成本的1.8倍
+        return Math.min(baseStop, minStopForCost);
+    }
+},
 
-        trailingStop: {
-            level1: {
-                trigger: 0.4,      // 同步
-                stopAt: 0.2        // 确保0.2%利润
-            },
-            level2: {
-                trigger: 0.8,
-                stopAt: 0.6
-            },
-            level3: {
-                trigger: 1.2,
-                stopAt: 0.9
-            },
-            level4: {
-                trigger: 1.8,
-                stopAt: 1.4
-            }
-        },
+partialTakeProfit: {
+    stage1: {
+        trigger: 1.8,      // 保证金盈利1.8%（价格波动约0.26%）
+        closePercent: 50   // 平50%，快速锁定成本+小利润
+    },
+    stage2: {
+        trigger: 3.5,      // 保证金盈利3.5%（价格波动约0.50%）
+        closePercent: 30   // 再平30%
+    },
+    stage3: {
+        trigger: 6.0,      // 保证金盈利6.0%（价格波动约0.86%）
+        closePercent: 10   // 最后20%
+    }
+},
+
+trailingStop: {
+    level1: {
+        trigger: 2.0,      // 盈利2.0%
+        stopAt: 1.2        // 确保1.2%利润
+    },
+    level2: {
+        trigger: 3.0,      // 盈利3.0%
+        stopAt: 2.0        // 确保2.0%利润
+    },
+    level3: {
+        trigger: 4.5,      // 盈利4.5%
+        stopAt: 3.0        // 确保3.0%利润
+    },
+    level4: {
+        trigger: 6.0,      // 盈利6.0%
+        stopAt: 4.0        // 确保4.0%利润
+    }
+},
 
       // ==================== 峰值回撤保护 ====================
       peakDrawdownProtection: 2,

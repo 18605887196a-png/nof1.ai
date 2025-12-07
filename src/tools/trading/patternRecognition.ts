@@ -1596,107 +1596,47 @@ export function extractModeFromAnalysis(analysis: string): string {
     return analysis.slice(0, 100);
 }
 
-
 export const patternAnalysisHFVisualTool = tool({
     name: "patternAnalysisHFVisual",
-    description: "基于 Coinglass 高频两周期（5m/1m），自动捕获图表并进行高频微结构识别（Support/Resistance、HL/LH、CVD/OI 微趋势）。适用于 HF-MicroTrader 高频/中频策略。",
-
+    description: "捕获图表 → 视觉模型 → JSON → 自动修复 → structured",
     parameters: z.object({
-        symbol: z.enum([
-            "BTC", "ETH", "SOL", "BNB",
-            "ADA", "XRP", "DOGE", "AVAX",
-            "DOT", "MATIC"
-        ]).describe("交易币种"),
-
+        symbol: z.enum(["BTC","ETH","SOL","BNB","ADA","XRP","DOGE","AVAX","DOT","MATIC"]),
         fastTimeframe: z.enum(["5m"]).default("5m"),
         microTimeframe: z.enum(["1m"]).default("1m"),
-
         enableThinking: z.boolean().optional().default(false)
     }),
-
     execute: async ({ symbol, fastTimeframe, microTimeframe, enableThinking }) => {
         try {
-
-            // ====================================================================
-            // ① 捕获两张图（5m + 1m）
-            // ====================================================================
-            const [
-                fastChartBase64,
-                microChartBase64
-            ] = await Promise.all([
-                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1150),  // 5m
-                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1000)  // 1m
+            const [chart5m, chart1m] = await Promise.all([
+                captureCoingleassChart(symbol, fastTimeframe, 'Gate', 1150),
+                captureCoingleassChart(symbol, microTimeframe, 'Gate', 1000)
             ]);
 
-            // ====================================================================
-            // ② 调用 HF 视觉引擎（runHFVisualAgent）
-            // ====================================================================
-            const analysis = await runHFVisualAgent(
-                fastChartBase64,
-                microChartBase64,
-                symbol,
-                enableThinking
-            );
+            const jsonStr = await runHFVisualAgent(chart5m, chart1m, symbol, enableThinking);
 
-            // ====================================================================
-            // ③ 提取可交易性（long/short/no-trade）
-            // ====================================================================
-            const tradability = extractHFTradability(analysis);
+            let parsed = null;
+            try { parsed = JSON.parse(jsonStr); } catch (e) {
+                console.warn(`[${symbol}] JSON parse failed, fallback to autoFix.`);
+            }
 
-            // ====================================================================
-            // ④ 记录视觉决策
-            // ====================================================================
-            // logDecisionConclusion("视觉（高频 5m+1m）决策结论", symbol, analysis, {
-            //     fastTimeframe,
-            //     microTimeframe
-            // });
+            const structured = autoFixVisionJson(parsed);
 
-            // ====================================================================
-            // ⑤ 发送 Telegram 通知（与主策略一致）
-            // ====================================================================
-            // await sendVisionAnalysisNotification({
-            //     symbol,
-            //     mainTimeframe: fastTimeframe,
-            //     entryTimeframe: microTimeframe,
-            //     microTimeframe: "1m",
-            //     analysis,
-            //     timestamp: new Date().toISOString()
-            // }).catch(err => {
-            //     logger.warn(`发送 HF 视觉分析 Telegram 通知失败: ${err.message}`);
-            // });
-
-            // ====================================================================
-            // ⑥ 返回结构（不包含 base64 图，节省 token）
-            // ====================================================================
             return {
                 symbol,
                 fastTimeframe,
                 microTimeframe,
-                analysis,
-                tradability,       // long / short / no-trade
+                analysis_raw: jsonStr,
+                structured,
+                tradability: null, // optional
                 timestamp: new Date().toISOString(),
                 success: true
             };
-
         } catch (err: any) {
-
-            logger.error(`HF 视觉分析失败: ${err}`);
-
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            logger.error(`[${symbol}] HF 视觉分析失败: ${errorMessage}`);
-
-            // 记录失败决策
-            logDecisionConclusion("视觉（高频 5m+1m）失败", symbol, `错误: ${errorMessage}`, {
-                fastTimeframe,
-                microTimeframe,
-                error: true
-            });
-
             return {
                 symbol,
                 fastTimeframe,
                 microTimeframe,
-                error: err instanceof Error ? err.message : String(err),
+                error: err.message,
                 timestamp: new Date().toISOString(),
                 success: false
             };
@@ -1704,165 +1644,385 @@ export const patternAnalysisHFVisualTool = tool({
     }
 });
 
-// HF 视觉引擎（runHFVisualAgent）
+function autoFixVisionJson(json: any): any {
+    // 如果解析失败或不是对象
+    if (!json || typeof json !== "object") return buildEmptyStructure();
+
+    const fixed = buildEmptyStructure(); // 全字段默认 null 或结构化空对象
+
+    // ---------- 工具函数 ----------
+    const toNum = (v: any) => {
+        if (v === null || v === undefined) return null;
+        if (typeof v === "number") return v;
+        if (typeof v === "string") {
+            const parsed = parseFloat(v);
+            return isNaN(parsed) ? null : parsed;
+        }
+        return null;
+    };
+
+    const validEnum = (v: any, allowed: string[]) =>
+        allowed.includes(v) ? v : null;
+
+    const booleanOr = (v: any) =>
+        typeof v === "boolean" ? v : false;
+
+    const rhythmEnum = (v: any) =>
+        validEnum(v, ["favorable", "neutral", "unfavorable"]);
+
+    const strengthEnum = (v: any) =>
+        validEnum(v, ["Weak", "Medium", "Strong"]);
+
+    // ---------- 1. market_state ----------
+    fixed.market_state = validEnum(
+        json.market_state,
+        ["trend", "trend_with_pullback", "range", "breakout_attempt", "reversal_attempt"]
+    );
+
+    // ---------- 2. trend_direction ----------
+    fixed.trend_direction = validEnum(
+        json.trend_direction,
+        ["up", "down", "sideways"]
+    );
+
+    // ---------- 3. trend_strength ----------
+    fixed.trend_strength = (() => {
+        const n = toNum(json.trend_strength);
+        if (!n) return 1;
+        if (n < 1) return 1;
+        if (n > 5) return 5;
+        return Math.round(n);
+    })();
+
+    // ---------- 4. micro_support ----------
+    if (json.micro_support && typeof json.micro_support === "object") {
+        fixed.micro_support = {
+            lower: toNum(json.micro_support.lower),
+            upper: toNum(json.micro_support.upper)
+        };
+        if (fixed.micro_support.lower === null || fixed.micro_support.upper === null) {
+            fixed.micro_support = null;
+        }
+    }
+
+    // ---------- 5. micro_resistance ----------
+    if (json.micro_resistance && typeof json.micro_resistance === "object") {
+        fixed.micro_resistance = {
+            lower: toNum(json.micro_resistance.lower),
+            upper: toNum(json.micro_resistance.upper)
+        };
+        if (fixed.micro_resistance.lower === null || fixed.micro_resistance.upper === null) {
+            fixed.micro_resistance = null;
+        }
+    }
+
+    // ---------- 6. structure_strength_support ----------
+    fixed.structure_strength_support = strengthEnum(json.structure_strength_support);
+
+    // ---------- 7. structure_strength_resistance ----------
+    fixed.structure_strength_resistance = strengthEnum(json.structure_strength_resistance);
+
+    // ---------- 8. HL ----------
+    if (json.hl && typeof json.hl === "object") {
+        const lower = toNum(json.hl?.range?.lower);
+        const upper = toNum(json.hl?.range?.upper);
+        const price = toNum(json.hl?.price);
+        if (price !== null && lower !== null && upper !== null) {
+            fixed.hl = {
+                price,
+                range: { lower, upper }
+            };
+        }
+    }
+
+    // ---------- 9. LH ----------
+    if (json.lh && typeof json.lh === "object") {
+        const lower = toNum(json.lh?.range?.lower);
+        const upper = toNum(json.lh?.range?.upper);
+        const price = toNum(json.lh?.price);
+        if (price !== null && lower !== null && upper !== null) {
+            fixed.lh = {
+                price,
+                range: { lower, upper }
+            };
+        }
+    }
+
+    // ---------- 10. CVD ----------
+    if (json.cvd && typeof json.cvd === "object") {
+        fixed.cvd = {
+            spot: validEnum(json.cvd?.spot, ["up", "down", "neutral"]),
+            futures: validEnum(json.cvd?.futures, ["up", "down", "neutral"]),
+            consistent: booleanOr(json.cvd?.consistent),
+            divergence: booleanOr(json.cvd?.divergence)
+        };
+    }
+
+    // ---------- 11. volume_structure ----------
+    fixed.volume_structure = typeof json.volume_structure === "string"
+        ? json.volume_structure
+        : "";
+
+    // ---------- 12. micro_rhythm_5m ----------
+    fixed.micro_rhythm_5m = rhythmEnum(json.micro_rhythm_5m);
+
+    // ---------- 13. micro_rhythm_1m ----------
+    fixed.micro_rhythm_1m = rhythmEnum(json.micro_rhythm_1m);
+
+    // ---------- 14. momentum ----------
+    fixed.momentum = validEnum(json.momentum, ["strong", "moderate", "weak"]);
+
+    // ---------- 15. liquidity_risk ----------
+    fixed.liquidity_risk = validEnum(json.liquidity_risk, ["low", "medium", "high"]);
+
+    return fixed;
+}
+
+// ===========================================
+// 返回空结构（所有字段齐全）
+// ===========================================
+function buildEmptyStructure() {
+    return {
+        market_state: null,
+        trend_direction: null,
+        trend_strength: 1,
+        micro_support: null,
+        micro_resistance: null,
+        structure_strength_support: null,
+        structure_strength_resistance: null,
+        hl: null,
+        lh: null,
+        cvd: {
+            spot: null,
+            futures: null,
+            consistent: false,
+            divergence: false
+        },
+        volume_structure: "",
+        micro_rhythm_5m: null,
+        micro_rhythm_1m: null,
+        momentum: null,
+        liquidity_risk: null
+    };
+}
+
+// ===========================================
+// 视觉模型：结构化 JSON 输出（最终集成版）
+// ===========================================
 export async function runHFVisualAgent(
     chart5mBase64: string,
     chart1mBase64: string,
     symbol: string,
     enableThinking: boolean = false
 ): Promise<string> {
+
     try {
         const apiKey = process.env.VISION_API_KEY || process.env.OPENAI_API_KEY;
-        const baseUrl = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
+        const baseURL = process.env.VISION_BASE_URL || "https://dashscope.aliyuncs.com/compatible-mode/v1";
         const model = process.env.VISION_MODEL_NAME || "qwen3-vl-plus";
 
-        enableThinking=true;
+        enableThinking = true;
 
         if (!chart5mBase64 || !chart1mBase64) {
-            throw new Error("缺少图像数据（5m/1m）。");
+            throw new Error("5m/1m screenshot missing.");
         }
 
-        const openai = new OpenAI({ apiKey, baseURL: baseUrl });
+        // ======================================================
+        // 完整版视觉 System Prompt（最终版 + OHLC/刻度防误读）
+        // ======================================================
 
-        const response = await openai.chat.completions.create({
+        const systemPrompt = `
+你是一名专业的高频结构图表视觉分析专家。你必须严格根据提供的 5m 与 1m K 线图（包含 VPVR、成交量、CVD、刻度等）分析当前结构并输出 JSON。
+
+============================================================
+【最高规则】
+============================================================
+- 禁止预测未来，只能解释图中已经发生的事实。
+- 禁止创造图中不存在的结构。
+- 若某结构无法从图中可靠识别 → 使用 null（不能使用“无/unknown/xxxx”）。
+- 可以根据图中影线 & VPVR 进行估计，但不能凭空臆造。
+- 最终输出必须是一个干净的 JSON 对象，不允许包含 markdown、注释或额外解释。
+
+============================================================
+【图像中的价格刻度（Price Scale）与 UI 信息说明】
+============================================================
+1. 图像右侧垂直数字是价格刻度（Price Scale）：
+   - 仅可用于判断大致价格位置
+   - 不能用于判断趋势、HL/LH 或支撑阻力
+
+2. 图表右上角或左上角可能显示：
+   - OHLC（开盘 / 最高 / 最低 / 收盘）
+   - 最新价格
+   - 涨跌幅
+   - 信息提示浮层（tooltip）
+   这些全部属于图表 UI 标签，禁止用于结构分析、趋势判断、HL/LH 或区间判断。
+
+3. 所有非 K 线、非 VPVR、非成交量、非 CVD 的 UI 数字均不能用于结构推断。
+
+============================================================
+【可用于推断的合法视觉信息】
+============================================================
+允许使用图像中的：
+- K线摆动结构（高低点、影线、波段节奏）
+- VPVR（成交密集区）识别支撑/阻力
+- CVD（spot & futures）方向、一致性、背离
+- 1m 微结构、5m 大结构结合判断趋势框架
+- 成交量柱强弱
+- 图右侧价格刻度作为区间估计参考
+
+禁止使用：
+- OHLC 标签
+- tooltip 浮框
+- 图像 UI 元素
+- 图外信息
+- 任何预测性推断
+
+============================================================
+【市场状态 market_state】
+============================================================
+trend：连续 HL/HH 或 LH/LL  
+trend_with_pullback：趋势中健康回调  
+range：横盘震荡  
+breakout_attempt：突破尝试  
+reversal_attempt：潜在反转但结构未完成
+
+============================================================
+【趋势方向 trend_direction 与趋势强度 trend_strength】
+============================================================
+trend_direction：
+- up：HL + HH 结构
+- down：LH + LL 结构
+- sideways：方向不明确
+
+trend_strength：1～5
+5 = 强趋势 / 结构极清晰  
+4 = 偏强  
+3 = 正常  
+2 = 弱势  
+1 = 无趋势
+
+============================================================
+【支撑/阻力区间 micro_support / micro_resistance】
+============================================================
+依据：
+- VPVR 蓝柱密集区
+- 局部摆动低点（support）
+- 局部摆动高点（resistance）
+- 使用影线范围估计 upper/lower
+
+无法可靠识别 → null
+
+============================================================
+【HL / LH 结构识别（基于图像摆动）】
+============================================================
+HL：
+- 明显较高的低点
+- 位于支撑区附近
+- range = 影线区间
+
+LH：
+- 明显较低的高点
+- 位于阻力区附近
+
+没有形成 → null
+
+============================================================
+【CVD 判定规则】
+============================================================
+spot/futures:
+- up：斜率向上
+- down：斜率向下
+- neutral：横盘
+
+consistent：二者方向是否一致  
+divergence：价格 vs CVD 是否背离
+
+============================================================
+【微节奏 micro_rhythm】
+============================================================
+favorable：顺趋势结构、有序波段  
+neutral：一般  
+unfavorable：逆势或扫单结构  
+
+============================================================
+【动能 momentum 与流动性风险 liquidity_risk】
+============================================================
+momentum：strong / moderate / weak  
+liquidity_risk：
+- low：稳定流动  
+- medium：正常  
+- high：长影线 + 扫单 + 体积稀薄（仅图像可见）  
+
+============================================================
+【必须输出 JSON】
+============================================================
+严格输出以下 JSON，将所有字段补齐（不可删除字段，无法识别时用 null）：
+
+{
+  "market_state": "...",
+  "trend_direction": "...",
+  "trend_strength": 3,
+  "micro_support": {"lower": 123, "upper": 456} | null,
+  "micro_resistance": {"lower": 123, "upper": 456} | null,
+  "structure_strength_support": "Weak"|"Medium"|"Strong",
+  "structure_strength_resistance": "Weak"|"Medium"|"Strong",
+
+  "hl": {
+    "price": 123,
+    "range": {"lower":123, "upper":456}
+  } | null,
+
+  "lh": {
+    "price": 123,
+    "range": {"lower":123, "upper":456}
+  } | null,
+
+  "cvd": {
+    "spot": "up"|"down"|"neutral",
+    "futures": "up"|"down"|"neutral",
+    "consistent": true|false,
+    "divergence": true|false
+  },
+
+  "volume_structure": "string",
+  "micro_rhythm_5m": "favorable"|"neutral"|"unfavorable",
+  "micro_rhythm_1m": "favorable"|"neutral"|"unfavorable",
+  "momentum": "strong"|"moderate"|"weak",
+  "liquidity_risk": "low"|"medium"|"high"
+}
+`;
+
+        const client = new OpenAI({ apiKey, baseURL });
+
+        const response = await client.chat.completions.create({
             model,
-            max_completion_tokens: 4096,
+            enable_thinking: true,
+            temperature: 0.1,
+            max_completion_tokens: 4000,
             messages: [
-                {
-                    role: "system",
-                    content: `============================================================
-【视觉安全规则（最高优先级）】
-============================================================
-● 不预测未来，不使用推测性语言。  
-● 不得创造图中不存在的趋势、结构、价格区间或 HL/LH。  
-● 某些K线图左上角出现的 OHLC 四个数字只是标签，不得使用 OHLC 判定 HL/LH、支撑/阻力、趋势、高低点或突破。  
-● 只能基于图像中看到的信息进行判断。  
-● 输出格式不得改变，字段不得增删。
-
-============================================================
-【价格来源规则】
-============================================================
-你只能从图像中如下来源获取价格信息：
-
-✔ VPVR（右侧成交密集区）的价格刻度（唯一价格锚点）  
-✔ K 线在 VPVR 上的相对高度位置  
-✔ 1m/5m 图像中的摆动结构  
-
-============================================================
-【Micro Support / Resistance 区间推断规则】
-============================================================
-你必须根据 VPVR 密集区（蓝/黄柱）、摆动高低点推断价格区间。
-格式：xxxx - xxxx  
-必须真实推断，不得使用占位符。
-
-============================================================
-【结构点规则（HL/LH）】
-============================================================
-HL 区间：根据 VPVR 价格刻度 + K线最低点位置（允许估算 ±几十 USD）  
-LH 区间：根据 VPVR 价格刻度 + K线最高点位置（允许估算 ±几十 USD）  
-
-============================================================
-【趋势强度评分（Trend Strength Score）】
-============================================================
-根据 1m + 5m 图像的综合结构，给出趋势力度评分（1~5）：
-
-评分标准：
-5 = 强趋势（急跌急涨，连续 HH/LL，极强动量，深 CVD 倾斜）  
-4 = 偏强趋势（结构完整，动量良好，回调浅）  
-3 = 中性趋势（动量一般，有来回扫）  
-2 = 弱趋势（趋势不健康、回调深、CVD 不稳）  
-1 = 无趋势（range / chop / 混乱）  
-
-输出格式：Trend Strength：1~5
-
-============================================================
-【VPVR 结构强度评分（Structure Strength）】
-============================================================
-根据 VPVR 蓝/黄柱厚度、深度、密集度判断结构强度：
-
-Strong：厚柱 + 连续密集 → 强支撑/阻力  
-Medium：中等密度 → 一般有效  
-Weak：细碎、小柱 → 弱结构，易被扫  
-
-输出字段：
-Structure Strength（Support）：Weak / Medium / Strong  
-Structure Strength（Resistance）：Weak / Medium / Strong
-
-============================================================
-【最终输出格式（严格执行）】
-============================================================
-【趋势方向】
-xxxx
-
-【趋势强度】
-Trend Strength：x
-
-【关键区间】
-Micro Support：xxxx - xxxx
-Micro Resistance：xxxx - xxxx
-Structure Strength（Support）：xxxx
-Structure Strength（Resistance）：xxxx
-
-【结构点】
-HL：xxxx
-HL区间：xxxx - xxxx
-LH：xxxx
-LH区间：xxxx - xxxx
-
-【价格位置关系】
-xxxx
-
-【CVD】
-Spot CVD：xxxx
-Futures CVD：xxxx
-一致性：YES/NO
-背离：有/无
-
-【成交量结构】
-xxxx
-
-【微节奏】
-5m：xxxx
-1m：xxxx
-
-【动量】
-xxxx
-
-【流动性风险】
-low / medium / high
-
-【可交易性】
-xxxx`
-                },
+                { role: "system", content: systemPrompt },
                 {
                     role: "user",
                     content: [
-                        { type: "text", text: `请对 ${symbol} 的 5m / 1m 图进行结构分析：` },
-                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart5mBase64}`, detail: "high" }},
-                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart1mBase64}`, detail: "high" }},
+                        { type: "text", text: `请分析 ${symbol} 的 5m / 1m 图结构：` },
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart5mBase64}` } },
+                        { type: "image_url", image_url: { url: `data:image/png;base64,${chart1mBase64}` } }
                     ]
                 }
-            ],
-            temperature: 0.1,
-            enable_thinking: enableThinking
+            ]
         });
 
-        return (response.choices[0]?.message?.content ?? "").trim();
+        let content = response.choices[0]?.message?.content?.trim() ?? "";
+
+        // 若有 ```json 包裹，提取内部 JSON
+        const match = content.match(/```(?:json)?\s*([\s\S]*?)```/);
+        if (match) content = match[1];
+
+        return content;
 
     } catch (err) {
-        console.error(`[${symbol}] HF视觉分析失败:`, err);
-        return `
-【微结构判定】无  
-【关键区间】  
-Micro Support：无  
-Micro Resistance：无  
-【HL/LH】无  
-【CVD/OI】无  
-【5m/1m 微节奏】中性  
-【市场状态】range  
-【动量衰竭】none  
-【流动性风险】medium  
-【可交易性】禁止交易`;
+        console.error("runHFVisualAgent error:", err);
+        return "{}";
     }
 }
 

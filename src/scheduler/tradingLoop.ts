@@ -2169,11 +2169,11 @@ logger.info(`支持币种: ${SYMBOLS.join(", ")}`);
 
 // 执行交易决策前的检查
 function executeTradingWithCheck() {
-  if (isLowVolatilityPeriod()) {
-    const description = getLowVolatilityDescription();
-    logger.info(`跳过本次执行 - ${description}`);
-    return false;
-  }
+  // if (isLowVolatilityPeriod()) {
+  //   const description = getLowVolatilityDescription();
+  //   logger.info(`跳过本次执行 - ${description}`);
+  //   return false;
+  // }
   executeTradingDecision();
   return true;
 }
