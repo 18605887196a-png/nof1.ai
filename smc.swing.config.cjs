@@ -8,8 +8,8 @@ module.exports = {
   apps: [
     {
       name: "smc-swing-trader",
-      script: "manual/smc-swing.ts", // 修正了脚本路径
-      interpreter: "tsx",                      // 正确执行 TypeScript
+      script: "tsx",
+      args: "--env-file=.env manual/smc-swing.ts",
       instances: 1,
       exec_mode: "fork",
       watch: false,
