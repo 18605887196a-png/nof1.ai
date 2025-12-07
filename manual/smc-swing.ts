@@ -319,27 +319,25 @@ async function sendTelegramNotification(
         const cleanSummary = summary.replace(/\*\*/g, '').replace(/###/g, '');
         const summaryLines = cleanSummary.split('\n').filter(line => line.trim() !== '');
         
-        lines.push('【综合决策】');
-        lines.push('');
+        lines.push('【综合决策结论】');
         summaryLines.forEach(line => {
             if (line.trim()) {
-                lines.push(line);
-                // 在重要部分后添加空行
-                if (line.includes('🌊') || line.includes('宏观大势') || 
+                // 在重要部分前添加空行
+                if (
+                    line.includes('🌊') || line.includes('宏观大势') || 
                     line.includes('⚡') || line.includes('结构确认') ||
                     line.includes('🎯') || line.includes('最终决策') ||
                     line.includes('📝') || line.includes('交易计划') ||
                     line.includes('⚠️') || line.includes('风险提示')) {
                     lines.push('');
                 }
+                lines.push(line);
             }
         });
         lines.push('');
         
         // ========== 第二部分：三个视觉模型的原始分析 ==========
         lines.push('【原始图像分析结论】');
-        lines.push('');
-        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
         lines.push('');
 
         // 4H 宏观趋势
@@ -393,7 +391,7 @@ async function sendTelegramNotification(
 
         // 发送通知
         const notificationData = {
-            title: `${emoji} ${symbol} SMC 波段信号（每小时播报一次）`,
+            title: `${emoji} ${symbol} SMC 波段信号（小时级别播报）`,
             lines: lines,
             emoji: emoji
         };
