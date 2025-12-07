@@ -114,7 +114,7 @@ SMC置信度：[高/中/低]`
         const response = await client.chat.completions.create({
             model: CONFIG.visionApiConfig.model,
             temperature: 0.1,
-            max_completion_tokens: 4000, // 稍微降低token数省钱
+            max_completion_tokens: 2000, // 稍微降低token数省钱
             messages: [
                 {role: 'system', content: getPrompt(timeframe)},
                 {
@@ -217,7 +217,7 @@ ${analyses.entry}
         const response = await client.chat.completions.create({
             model: CONFIG.textApiConfig.model,
             temperature: 0.1,
-            max_completion_tokens: 4000,
+            max_completion_tokens: 8000,
             messages: [{role: 'system', content: systemPrompt}]
         });
         const content = response.choices[0]?.message?.content || 'DeepSeek汇总失败';
@@ -314,73 +314,86 @@ async function sendTelegramNotification(
 
         const emoji = direction === '做多' ? '📈' : direction === '做空' ? '📉' : '👀';
         const lines: string[] = [];
-
-        // ========== 第一部分：DeepSeek 综合结论 ==========
-        lines.push(`${emoji} ${symbol} SMC 波段交易报告`);
-        lines.push('═'.repeat(35));
-        lines.push('');
         
         // 清理markdown符号
         const cleanSummary = summary.replace(/\*\*/g, '').replace(/###/g, '');
         const summaryLines = cleanSummary.split('\n').filter(line => line.trim() !== '');
         
         lines.push('【综合决策】');
+        lines.push('');
         summaryLines.forEach(line => {
-            if (line.trim()) lines.push(line);
+            if (line.trim()) {
+                lines.push(line);
+                // 在重要部分后添加空行
+                if (line.includes('🌊') || line.includes('宏观大势') || 
+                    line.includes('⚡') || line.includes('结构确认') ||
+                    line.includes('🎯') || line.includes('最终决策') ||
+                    line.includes('📝') || line.includes('交易计划') ||
+                    line.includes('⚠️') || line.includes('风险提示')) {
+                    lines.push('');
+                }
+            }
         });
+        lines.push('');
         
-        lines.push('');
-        lines.push('─'.repeat(35));
-        lines.push('');
-
         // ========== 第二部分：三个视觉模型的原始分析 ==========
-        lines.push('【原始分析详情】');
+        lines.push('【原始图像分析结论】');
+        lines.push('');
+        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
         lines.push('');
 
         // 4H 宏观趋势
         if (analyses.trend) {
             lines.push('🌍 4小时图 (宏观趋势)：');
+            lines.push('');
             const trendLines = analyses.trend.split('\n').slice(0, 15); // 取前15行
             trendLines.forEach(line => {
                 const trimmed = line.trim();
                 if (trimmed && !trimmed.startsWith('#')) {
-                    lines.push(`   ${trimmed.substring(0, 100)}`);
+                    lines.push(`   • ${trimmed.substring(0, 100)}`);
                 }
             });
+            lines.push('');
             lines.push('');
         }
 
         // 1H 结构确认
         if (analyses.decision) {
             lines.push('⚡ 1小时图 (结构确认)：');
+            lines.push('');
             const decisionLines = analyses.decision.split('\n').slice(0, 12); // 取前12行
             decisionLines.forEach(line => {
                 const trimmed = line.trim();
                 if (trimmed && !trimmed.startsWith('#')) {
-                    lines.push(`   ${trimmed.substring(0, 100)}`);
+                    lines.push(`   • ${trimmed.substring(0, 100)}`);
                 }
             });
+            lines.push('');
             lines.push('');
         }
 
         // 15m 入场触发
         if (analyses.entry) {
             lines.push('🎯 15分钟图 (入场触发)：');
+            lines.push('');
             const entryLines = analyses.entry.split('\n').slice(0, 12); // 取前12行
             entryLines.forEach(line => {
                 const trimmed = line.trim();
                 if (trimmed && !trimmed.startsWith('#')) {
-                    lines.push(`   ${trimmed.substring(0, 100)}`);
+                    lines.push(`   • ${trimmed.substring(0, 100)}`);
                 }
             });
         }
+        
+        lines.push('');
+        lines.push('━━━━━━━━━━━━━━━━━━━━━━━━');
 
         console.log(`${COLORS.cyan}[通知] 消息构建完成，共 ${lines.length} 行${COLORS.reset}`);
         console.log(`${COLORS.cyan}[通知] 准备发送到Telegram...${COLORS.reset}`);
 
         // 发送通知
         const notificationData = {
-            title: `${emoji} ${symbol} SMC 波段信号`,
+            title: `${emoji} ${symbol} SMC 波段信号（每小时播报一次）`,
             lines: lines,
             emoji: emoji
         };
