@@ -18,20 +18,25 @@ const CONFIG = {
     symbols: ['BTC'] as const,
     // 频率：每60分钟运行一次 (每天仅24次调用，极大节省成本)
     intervalMinutes: 60,
-
+        activeHours: {
+        // 运行时段：15:00-01:00（共11小时，覆盖欧美交易时段）
+        // 跳过时段：02:00-14:00（共13小时，节省54%的API调用）
+        skipHours: [2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14],
+        
+        // 周末过滤：周六全天跳过（周五美股收盘后交易量极低）
+        skipWeekday: [6],  // 6 = 周六
+    },
     // 时间框架组合：放大周期
     timeframes: {
         trend: '4h',    // 宏观趋势：4小时图
         decision: '1h', // 关键决策：1小时图
         entry: '15m'    // 精确入场：15分钟图
     },
-
     chartOffsets: {
         '4h': 600,
         '1h': 600,
         '15m': 600
     },
-
     // 视觉模型配置
     visionApiConfig: {
         model: 'gemini-3-pro-preview-thinking', // 建议尝试 gemini-2.0-flash-exp 以进一步降低成本
@@ -56,6 +61,31 @@ const COLORS = {
     white: '\x1b[37m',
     reset: '\x1b[0m'
 } as const;
+
+// ========== 时间管理函数 ==========
+function shouldRunNow(): boolean {
+    const now = new Date();
+    const hour = now.getHours(); // 北京时间小时数
+    const day = now.getDay(); // 0=周日, 1=周一, ..., 6=周六
+    
+    // 1. 检查是否是周六（全天跳过）
+    if (CONFIG.activeHours.skipWeekday && CONFIG.activeHours.skipWeekday.includes(day)) {
+        console.log(`${COLORS.yellow}[时间] 今天是周${['日','一','二','三','四','五','六'][day]}，属于低波动期，跳过本次运行${COLORS.reset}`);
+        console.log(`${COLORS.yellow}[时间] 💡 提示：周六交易量极低（周五美股收盘后），周日晚上恢复运行${COLORS.reset}`);
+        return false;
+    }
+    
+    // 2. 检查是否在跳过时段
+    if (CONFIG.activeHours.skipHours.includes(hour)) {
+        console.log(`${COLORS.yellow}[时间] 当前时间 ${hour}:00 处于低波动期，跳过本次运行${COLORS.reset}`);
+        console.log(`${COLORS.yellow}[时间] 💡 跳过时段: ${CONFIG.activeHours.skipHours[0]}:00-${CONFIG.activeHours.skipHours[CONFIG.activeHours.skipHours.length-1]}:00${COLORS.reset}`);
+        return false;
+    }
+    
+    // 3. 通过检查，开始运行
+    console.log(`${COLORS.green}[时间] ✓ 当前时间 ${hour}:00 (周${['日','一','二','三','四','五','六'][day]}) 处于活跃交易时段${COLORS.reset}`);
+    return true;
+}
 
 // ========== 视觉分析函数 (适配波段策略) ==========
 async function analyzeChart(symbol: string, timeframe: string, chartBase64: string): Promise<string> {
@@ -482,6 +512,11 @@ async function main() {
     await initTelegramBot();
 
     const run = async () => {
+        if (!shouldRunNow()) {
+            console.log(`${COLORS.cyan}[运行] 本次运行已跳过，等待下一个活跃时段...${COLORS.reset}`);
+            return;
+        }
+
         console.log(`${COLORS.blue}[运行] 开始执行波段分析任务...${COLORS.reset}`);
         for (const sym of CONFIG.symbols) {
             console.log(`${COLORS.cyan}[${sym}] 开始分析${COLORS.reset}`);
