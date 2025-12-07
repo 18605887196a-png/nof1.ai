@@ -144,7 +144,7 @@ SMC置信度：[高/中/低]`
         const response = await client.chat.completions.create({
             model: CONFIG.visionApiConfig.model,
             temperature: 0.1,
-            max_completion_tokens: 2000, // 稍微降低token数省钱
+            max_completion_tokens: 8000, // 稍微降低token数省钱
             messages: [
                 {role: 'system', content: getPrompt(timeframe)},
                 {
@@ -279,13 +279,24 @@ async function analyzeIntradayTrade(symbol: string): Promise<{
         ]);
         console.log(`${COLORS.green}[图表] ✓ 三张图表获取完成${COLORS.reset}`);
 
-        // 2. 视觉分析
+        // 2. 视觉分析 (逐个等待)
         console.log(`${COLORS.blue}[分析] AI 视觉分析中...${COLORS.reset}`);
-        const [analysisTrend, analysisDecision, analysisEntry] = await Promise.all([
+        const [analysisTrend, analysisDecision, analysisEntry] = await Promise.allSettled([
             analyzeChart(symbol, CONFIG.timeframes.trend, chartTrend),
             analyzeChart(symbol, CONFIG.timeframes.decision, chartDecision),
             analyzeChart(symbol, CONFIG.timeframes.entry, chartEntry)
         ]);
+        // console.log(`${COLORS.cyan}[分析] 正在分析4小时趋势图...${COLORS.reset}`);
+        // const analysisTrend = await analyzeChart(symbol, CONFIG.timeframes.trend, chartTrend);
+        // console.log(`${COLORS.green}[分析] ✓ 4小时趋势分析完成${COLORS.reset}`);
+        
+        // console.log(`${COLORS.cyan}[分析] 正在分析1小时结构图...${COLORS.reset}`);
+        // const analysisDecision = await analyzeChart(symbol, CONFIG.timeframes.decision, chartDecision);
+        // console.log(`${COLORS.green}[分析] ✓ 1小时结构分析完成${COLORS.reset}`);
+        
+        // console.log(`${COLORS.cyan}[分析] 正在分析15分钟入场图...${COLORS.reset}`);
+        // const analysisEntry = await analyzeChart(symbol, CONFIG.timeframes.entry, chartEntry);
+        // console.log(`${COLORS.green}[分析] ✓ 15分钟入场分析完成${COLORS.reset}`);
 
         // ========== 调试日志：确认视觉分析结果 ==========
         console.log(`${COLORS.cyan}[调试] 视觉分析结果汇总:${COLORS.reset}`);
