@@ -69,10 +69,11 @@ interface AlertNotificationPayload {
   emoji?: string;
 }
 
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || "";
-const TELEGRAM_BASE_URL = TELEGRAM_TOKEN
-  ? `https://api.telegram.org/bot${TELEGRAM_TOKEN}`
-  : "";
+const TELEGRAM_TOKEN = () => process.env.TELEGRAM_BOT_TOKEN || "";
+const TELEGRAM_BASE_URL = () => {
+  const token = TELEGRAM_TOKEN();
+  return token ? `https://api.telegram.org/bot${token}` : "";
+};
 
 const notifyChats = new Set<string>();
 let botReady = false;
@@ -96,10 +97,11 @@ async function callTelegramApi<T = any>(
   method: string,
   payload: Record<string, unknown>,
 ): Promise<T | null> {
-  if (!TELEGRAM_BASE_URL) return null;
+  const baseUrl = TELEGRAM_BASE_URL();
+  if (!baseUrl) return null;
   
   try {
-    const url = `${TELEGRAM_BASE_URL}/${method}`;
+    const url = `${baseUrl}/${method}`;
     logger.debug(`调用 Telegram API: ${method}, URL: ${url}`);
     
     const response = await axios.post(url, payload, {
@@ -145,10 +147,11 @@ async function callTelegramApiWithFormData<T = any>(
   method: string,
   formData: FormData,
 ): Promise<T | null> {
-  if (!TELEGRAM_BASE_URL) return null;
+  const baseUrl = TELEGRAM_BASE_URL();
+  if (!baseUrl) return null;
   
   try {
-    const url = `${TELEGRAM_BASE_URL}/${method}`;
+    const url = `${baseUrl}/${method}`;
     logger.debug(`调用 Telegram API (FormData): ${method}, URL: ${url}`);
     
     const response = await axios.post(url, formData, {
@@ -194,7 +197,10 @@ async function sendMessage(
   text: string,
   parseMode: "HTML" | "Markdown" = "HTML",
 ) {
-  if (!botReady || !TELEGRAM_BASE_URL) return;
+  if (!botReady) return;
+  const baseUrl = TELEGRAM_BASE_URL();
+  if (!baseUrl) return;
+  
   await callTelegramApi("sendMessage", {
     chat_id: chatId,
     text,
@@ -207,39 +213,61 @@ async function broadcastMessage(
   text: string,
   parseMode: "HTML" | "Markdown" = "HTML",
 ) {
-  if (!botReady) return;
+  if (!botReady) {
+    logger.warn("broadcastMessage: Telegram 机器人未就绪");
+    return;
+  }
   if (notifyChats.size === 0) {
     logger.warn("Telegram 通知已丢弃：未配置可通知的 chat id");
     return;
   }
+  
+  logger.info(`broadcastMessage: 准备向 ${notifyChats.size} 个聊天发送消息`);
+  const chatIds = Array.from(notifyChats);
+  
   await Promise.all(
-    [...notifyChats].map((chatId) =>
-      sendMessage(chatId, text, parseMode).catch((error) => {
+    chatIds.map((chatId) => {
+      logger.debug(`正在发送消息到 chatId: ${chatId}`);
+      return sendMessage(chatId, text, parseMode).catch((error) => {
         logger.warn(
           `发送 Telegram 消息到 ${chatId} 失败: ${(error as Error).message}`,
         );
-      }),
-    ),
+      });
+    }),
   );
+  
+  logger.info(`broadcastMessage: 消息发送完成`);
 }
 
 export async function initTelegramBot(): Promise<void> {
-  if (!TELEGRAM_TOKEN) {
+  logger.info("开始初始化 Telegram 机器人...");
+  
+  const token = TELEGRAM_TOKEN();
+  if (!token) {
     logger.info("未配置 TELEGRAM_BOT_TOKEN，跳过 Telegram 机器人初始化。");
+    logger.info("请在环境变量中设置 TELEGRAM_BOT_TOKEN 以启用 Telegram 通知");
     return;
   }
+  
   if (botReady) {
     logger.info("Telegram 机器人已初始化，无需重复启动。");
     return;
   }
 
-  parseChatList(
+  const chatIds = parseChatList(
     process.env.TELEGRAM_NOTIFY_CHAT_IDS ??
       process.env.TELEGRAM_CHAT_IDS,
-  ).forEach((chatId) => notifyChats.add(chatId));
+  );
+  
+  logger.info(`从环境变量解析到 ${chatIds.length} 个聊天ID`);
+  
+  chatIds.forEach((chatId) => {
+    notifyChats.add(chatId);
+    logger.debug(`添加聊天ID: ${chatId}`);
+  });
 
   botReady = true;
-  logger.info("Telegram 机器人已启动（仅通知模式）。");
+  logger.info(`Telegram 机器人已启动（仅通知模式）。已配置 ${notifyChats.size} 个通知目标`);
 }
 
 export async function stopTelegramBot(): Promise<void> {
@@ -281,7 +309,16 @@ interface AlertNotificationPayload {
 }
 
 export async function sendAlertNotification(payload: AlertNotificationPayload) {
-  if (!botReady) return;
+  if (!botReady) {
+    logger.warn("Telegram 机器人未就绪，跳过通知发送");
+    return;
+  }
+  
+  if (notifyChats.size === 0) {
+    logger.warn("Telegram 通知已丢弃：未配置可通知的 chat id");
+    return;
+  }
+  
   const emoji = payload.emoji ?? "⚡";
   const title = payload.title ?? "系统通知";
   const header = `<b>${escapeHtml(`${emoji} ${title}`)}</b>`;
@@ -289,6 +326,10 @@ export async function sendAlertNotification(payload: AlertNotificationPayload) {
     .map((line) => escapeHtml(line))
     .join("\n");
   const text = [header, body].filter(Boolean).join("\n");
+  
+  logger.info(`准备发送 Telegram 通知: ${title} 到 ${notifyChats.size} 个聊天`);
+  logger.debug(`通知内容: ${text.substring(0, 200)}...`);
+  
   await broadcastMessage(text);
 }
 
@@ -622,7 +663,9 @@ async function sendPhoto(
   photoPath: string | Buffer,
   caption?: string,
 ) {
-  if (!botReady || !TELEGRAM_BASE_URL) return;
+  if (!botReady) return;
+  const baseUrl = TELEGRAM_BASE_URL();
+  if (!baseUrl) return;
 
   try {
     const formData = new FormData();
@@ -662,7 +705,10 @@ async function sendMediaGroup(
   photos: (string | Buffer)[],
   caption?: string,
 ) {
-  if (!botReady || !TELEGRAM_BASE_URL) return;
+  if (!botReady) return;
+  const baseUrl = TELEGRAM_BASE_URL();
+  if (!baseUrl) return;
+  
   if (photos.length === 0) {
     logger.warn("没有图片可发送");
     return;
@@ -866,3 +912,4 @@ export async function sendVisionAnalysisWithImages(
 
 // 导出图片发送函数供外部使用
 export { sendPhoto, sendMediaGroup, broadcastPhoto, broadcastMediaGroup };
+
