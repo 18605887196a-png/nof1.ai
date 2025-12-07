@@ -136,11 +136,12 @@ export async function captureCoingleassChart(
                 await page.waitForTimeout(3000);
 
 
-                // 15分钟需要特殊处理：先点击button[8]打开菜单，再点击菜单项
-                if (timeframe === '15m') {
-                    logger.info('15分钟周期使用特殊处理逻辑...');
+                // 15分钟和4小时需要特殊处理：先点击button[8]打开菜单，再点击菜单项
+                if (timeframe === '15m' || timeframe === '4h') {
+                    const menuItemIndex = timeframe === '15m' ? 4 : 8; // 15分钟点击第4项，4小时点击第8项
+                    logger.info(`${timeframe} 周期使用特殊处理逻辑，菜单项索引: ${menuItemIndex}`);
 
-
+                    
                     try {
                         // 步骤1: 点击 button[8] 打开下拉菜单
                         const menuButtonXPath = `//*[@id="__next"]/main/div[1]/div/button[8]`;
@@ -156,23 +157,22 @@ export async function captureCoingleassChart(
                         await page.waitForTimeout(1000);
 
 
-                        // 步骤2: 点击菜单中的第4项（15分钟）
-                        const menuItemXPath = `/html/body/div[2]/div[3]/ul/li[4]`;
+                        // 步骤2: 点击菜单中的对应项（15分钟=第4项，4小时=第8项）
+                        const menuItemXPath = `/html/body/div[2]/div[3]/ul/li[${menuItemIndex}]`;
                         logger.info(`点击菜单项: ${menuItemXPath}`);
-
 
                         await page.waitForSelector(`xpath=${menuItemXPath}`, {timeout: 5000});
                         await page.click(`xpath=${menuItemXPath}`);
-                        logger.info('成功点击 15分钟 菜单项');
+                        logger.info(`成功点击 ${timeframe} 菜单项`);
 
 
                         // 等待图表重新加载
                         await page.waitForTimeout(5000);
-                        logger.info('成功切换到 15m，等待图表重新加载...');
+                        logger.info(`成功切换到 ${timeframe}，等待图表重新加载...`);
 
 
                     } catch (e) {
-                        logger.warn(`15分钟切换失败: ${e}, 使用默认周期`);
+                        logger.warn(`${timeframe} 切换失败: ${e}, 使用默认周期`);
                     }
                 } else {
                     // 1m, 5m, 30m 使用原有的直接点击逻辑
